@@ -8,6 +8,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Oswald:wght@400;500;600&display=swap">
+  <script>
+    // Тема до первой отрисовки, чтобы не было вспышки светлого экрана
+    (function () {
+      var mode = 'auto';
+      try { mode = localStorage.getItem('todo-list-ai.theme') || 'auto'; } catch (e) {}
+      var dark = mode === 'dark' || (mode === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      document.documentElement.dataset.themeMode = mode;
+    })();
+  </script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -18,7 +28,13 @@
       <span class="star" aria-hidden="true">✱</span>
     </button>
     <p class="topbar__clock" id="clock" aria-hidden="true"></p>
-    <span class="tb-btn tb-btn--line ai-status" id="ai-status" data-state="loading">AI: проверка…</span>
+    <div class="topbar__right">
+      <span class="tb-btn tb-btn--line ai-status" id="ai-status" data-state="loading">AI: проверка…</span>
+      <button type="button" class="tb-btn tb-btn--line theme-btn" id="theme-btn">
+        <span class="theme-btn__icon" aria-hidden="true">◐</span>
+        <span class="theme-btn__label">авто</span>
+      </button>
+    </div>
   </header>
 
   <main class="app">

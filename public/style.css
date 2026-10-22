@@ -23,8 +23,26 @@
   --gutter: clamp(16px, 4vw, 48px);
 }
 
+/* Тему выставляет скрипт в <head> до отрисовки: data-theme = light | dark
+   (режим «авто» превращается в тему системы). Без JS работает медиазапрос ниже. */
+:root { color-scheme: light; }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1b1a18;
+  --bg-alt: #242320;
+  --ink: #ece9e2;
+  --text: #f3f1ec;
+  --muted: #8d8b86;
+  --line: #4a4843;
+  --line-soft: #33312d;
+  --red: #e04a36;
+  --on-ink: #1b1a18;
+  --p-high: #e39a4a;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
+    color-scheme: dark;
     --bg: #1b1a18;
     --bg-alt: #242320;
     --ink: #ece9e2;
@@ -84,7 +102,7 @@ button { cursor: pointer; }
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   backdrop-filter: blur(8px);
 }
-.topbar__clock { margin: 0; font-size: 10px; color: var(--muted); white-space: nowrap; }
+.topbar__clock { grid-column: 2; margin: 0; font-size: 10px; color: var(--muted); white-space: nowrap; }
 
 .tb-btn {
   display: inline-flex;
@@ -106,7 +124,14 @@ button { cursor: pointer; }
 .tb-btn--dark:hover .star { color: var(--on-ink); }
 .tb-btn--dark[hidden] { display: none; }
 .tb-btn--dark #account-label { overflow: hidden; text-overflow: ellipsis; }
-.tb-btn--line { justify-self: end; border: 1px solid var(--ink); }
+.tb-btn--line { border: 1px solid var(--ink); }
+/* колонки закреплены: если кнопки аккаунта нет, остальное не съезжает */
+.topbar > .tb-btn--dark { grid-column: 1; }
+.topbar__right { grid-column: 3; justify-self: end; display: flex; gap: 8px; }
+
+.theme-btn { justify-content: center; min-width: 44px; padding: 0 14px; background: transparent; }
+.theme-btn:hover { background: var(--ink); color: var(--on-ink); }
+.theme-btn__icon { font-size: 16px; line-height: 1; }
 
 .ai-status::after { content: "✱"; color: var(--muted); font-size: 1.1em; }
 .ai-status[data-state="on"]::after { color: var(--red); }
@@ -529,7 +554,10 @@ select:focus-visible, input:focus-visible, button:focus-visible { outline: 2px s
   body { font-size: 13px; }
   .topbar { grid-template-columns: 1fr 1fr; padding-top: 12px; padding-bottom: 12px; }
   .topbar__clock { display: none; }
+  .topbar__right { grid-column: 2; }
   .tb-btn { min-height: 40px; padding: 0 14px; gap: 8px; font-size: 12px; }
+  .theme-btn { min-width: 40px; padding: 0 10px; }
+  .theme-btn__label { display: none; }
   .hero { grid-template-columns: 1fr; gap: 32px; }
   .add__row { flex-direction: column; }
   .add__row .btn { width: 100%; }

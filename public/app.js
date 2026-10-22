@@ -555,6 +555,38 @@ $('logout-btn').addEventListener('click', async () => {
 
 window.addEventListener('beforeunload', () => { Cloud.flush(); });
 
+// ---------- тема: авто → светлая → тёмная ----------
+
+const THEME_KEY = 'todo-list-ai.theme';
+const THEMES = {
+  auto: { icon: '◐', label: 'авто', title: 'Тема как в системе' },
+  light: { icon: '☀', label: 'светлая', title: 'Светлая тема' },
+  dark: { icon: '☾', label: 'тёмная', title: 'Тёмная тема' },
+};
+const NEXT_THEME = { auto: 'light', light: 'dark', dark: 'auto' };
+const themeBtn = $('theme-btn');
+const systemDark = matchMedia('(prefers-color-scheme: dark)');
+let themeMode = document.documentElement.dataset.themeMode || 'auto';
+
+function applyTheme() {
+  const dark = themeMode === 'dark' || (themeMode === 'auto' && systemDark.matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  document.documentElement.dataset.themeMode = themeMode;
+  const t = THEMES[themeMode];
+  themeBtn.querySelector('.theme-btn__icon').textContent = t.icon;
+  themeBtn.querySelector('.theme-btn__label').textContent = t.label;
+  themeBtn.title = `${t.title}. Нажмите, чтобы сменить`;
+  themeBtn.setAttribute('aria-label', `Тема: ${t.label}. Сменить`);
+}
+
+themeBtn.addEventListener('click', () => {
+  themeMode = NEXT_THEME[themeMode] || 'auto';
+  try { localStorage.setItem(THEME_KEY, themeMode); } catch {}
+  applyTheme();
+});
+systemDark.addEventListener('change', () => { if (themeMode === 'auto') applyTheme(); });
+applyTheme();
+
 // ---------- часы и координаты курсора, как в референсе ----------
 
 const clock = $('clock');
