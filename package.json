@@ -1,0 +1,19 @@
+{
+  "name": "todo-list-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "To do list с AI-приоритезацией задач",
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "start": "node scripts/dev.mjs",
+    "migrate": "node scripts/migrate.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.1.0",
+    "@neondatabase/serverless": "^1.2.0"
+  }
+}
