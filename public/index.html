@@ -23,12 +23,26 @@
 
   <main class="app">
     <section class="hero">
-      <h1 class="hero__title">
-        <span class="hero__line">Список</span>
-        <span class="hero__line hero__line--shift"><span class="hero__bar" aria-hidden="true"></span>дел</span>
-      </h1>
-      <p class="hero__lead">задачи, которые <span class="mark">AI</span> расставит<br>по важности и срокам</p>
-      <p class="hero__counter" id="counter"></p>
+      <div class="hero__main">
+        <p class="label">дела_<span id="hero-date"></span></p>
+        <h1 class="hero__title">
+          <span class="hero__line">Список</span>
+          <span class="hero__line hero__line--shift"><span class="hero__bar" aria-hidden="true"></span>дел</span>
+        </h1>
+        <p class="hero__lead">Задачи, которым <span class="mark">AI</span> расставит приоритет — по&nbsp;срокам и&nbsp;важности.</p>
+      </div>
+
+      <aside class="hero__stats" aria-label="Сводка по задачам">
+        <p class="label">сводка</p>
+        <dl class="stats">
+          <div class="stat"><dt>активные</dt><dd id="stat-active">00</dd></div>
+          <div class="stat stat--alert"><dt>просрочено</dt><dd id="stat-overdue">00</dd></div>
+          <div class="stat"><dt>на сегодня</dt><dd id="stat-today">00</dd></div>
+          <div class="stat"><dt>выполнено</dt><dd id="stat-done">00</dd></div>
+        </dl>
+        <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
+        <p class="hero__counter" id="counter"></p>
+      </aside>
     </section>
 
     <form class="add" id="add-form" autocomplete="off">

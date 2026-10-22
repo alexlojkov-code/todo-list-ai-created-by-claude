@@ -203,6 +203,24 @@ function renderTask(task, index) {
   return el('li', { className: 'item' + (task.done ? ' is-done' : ''), dataset: { id: task.id } }, children);
 }
 
+// Сводка на первом экране: числа двузначные, как подписи «зад. 01».
+function renderStats() {
+  const t = today();
+  const active = tasks.filter(x => !x.done);
+  const done = tasks.length - active.length;
+  const overdue = active.filter(x => x.dueDate && x.dueDate < t).length;
+  const due = active.filter(x => x.dueDate === t).length;
+  const pad = n => String(n).padStart(2, '0');
+  $('stat-active').textContent = pad(active.length);
+  $('stat-overdue').textContent = pad(overdue);
+  $('stat-overdue').closest('.stat').classList.toggle('is-active', overdue > 0);
+  $('stat-today').textContent = pad(due);
+  $('stat-done').textContent = pad(done);
+  const percent = tasks.length ? Math.round(done / tasks.length * 100) : 0;
+  $('progress-bar').style.width = percent + '%';
+  counter.textContent = tasks.length ? `готово ${percent}% · ${done} из ${tasks.length}` : 'задач пока нет';
+}
+
 function aiCandidates() {
   return tasks.filter(t => !t.done && t.prioritySource !== 'manual');
 }
@@ -237,6 +255,7 @@ function render() {
 
   const left = tasks.filter(t => !t.done).length;
   counter.textContent = tasks.length ? `Осталось: ${left} ${plural(left, 'задача', 'задачи', 'задач')}` : '';
+  renderStats();
   empty.hidden = visible.length > 0;
   empty.textContent = tasks.length ? 'В этом фильтре пусто' : 'Задач пока нет';
   clearDone.hidden = !tasks.some(t => t.done);
@@ -545,6 +564,7 @@ function tickClock() {
   const now = new Date();
   const date = now.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
   clock.textContent = `${date}_${now.toLocaleTimeString('ru-RU')}`;
+  $('hero-date').textContent = now.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 tickClock();
 setInterval(tickClock, 1000);
