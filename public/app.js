@@ -33,6 +33,8 @@ let aiBusy = false;
 let undoSnapshot = null;
 let toastTimer = null;
 const openReasons = new Set();
+// Редактируемая задача и черновик полей: черновик переживает перерисовку (например, при синхронизации)
+let editing = null; // { id, title, description, dueDate }
 
 // ---------- хранение ----------
 
@@ -158,7 +160,36 @@ function compare(a, b) {
 
 // ---------- отрисовка ----------
 
+function renderEditor(task, index) {
+  const form = el('form', { className: 'item__form', dataset: { action: 'edit-form' } }, [
+    el('label', { className: 'field' }, [
+      el('span', { textContent: 'название' }),
+      el('input', { type: 'text', name: 'title', className: 'item__edit', value: editing.title, maxLength: 200, required: true }),
+    ]),
+    el('label', { className: 'field' }, [
+      el('span', { textContent: 'описание' }),
+      el('textarea', { name: 'description', className: 'item__textarea', value: editing.description, maxLength: 2000, rows: 2, placeholder: 'необязательно' }),
+    ]),
+    el('div', { className: 'item__form-row' }, [
+      el('label', { className: 'field field--inline' }, [
+        el('span', { textContent: 'срок' }),
+        el('input', { type: 'date', name: 'dueDate', value: editing.dueDate }),
+      ]),
+      el('div', { className: 'item__form-actions' }, [
+        el('button', { type: 'button', className: 'btn btn--line', textContent: 'Отмена', dataset: { action: 'edit-cancel' } }),
+        el('button', { type: 'submit', className: 'btn btn--dark' }, ['Сохранить ', el('span', { className: 'star', textContent: '✱', 'aria-hidden': 'true' })]),
+      ]),
+    ]),
+    el('p', { className: 'item__form-hint', textContent: 'Enter — сохранить · Esc — отменить' }),
+  ]);
+  return el('li', { className: 'item is-editing', dataset: { id: task.id } }, [
+    el('span', { className: 'item__num', textContent: `ред. ${String(index + 1).padStart(2, '0')}`, 'aria-hidden': 'true' }),
+    form,
+  ]);
+}
+
 function renderTask(task, index) {
+  if (editing?.id === task.id) return renderEditor(task, index);
   const overdue = task.dueDate && !task.done && task.dueDate < today();
 
   const prio = el('select', { className: 'prio', title: 'Приоритет', dataset: { p: task.priority, action: 'priority' } },
@@ -177,6 +208,10 @@ function renderTask(task, index) {
       'aria-expanded': String(openReasons.has(task.id)),
     }));
   }
+  meta.push(el('button', {
+    type: 'button', className: 'badge badge--edit', textContent: '✎ изменить',
+    title: 'Изменить название, описание и срок', dataset: { action: 'edit' },
+  }));
   if (task.dueDate) {
     meta.push(el('span', {
       className: 'item__due' + (overdue ? ' is-overdue' : ''),
@@ -251,7 +286,10 @@ function render() {
     .filter(t => filter === 'all' ? true : filter === 'done' ? t.done : !t.done)
     .sort(compare);
 
+  // если перерисовка случилась посреди редактирования, курсор возвращается в то же поле
+  const focused = document.activeElement?.closest?.('.is-editing') ? document.activeElement.name : null;
   list.replaceChildren(...visible.map(renderTask));
+  if (focused) list.querySelector(`.is-editing [name="${focused}"]`)?.focus();
 
   const left = tasks.filter(t => !t.done).length;
   counter.textContent = tasks.length ? `Осталось: ${left} ${plural(left, 'задача', 'задачи', 'задач')}` : '';
@@ -373,34 +411,74 @@ list.addEventListener('click', e => {
     commit(tasks.filter(t => t.id !== id));
   }
   if (action === 'unlock') patch(id, { prioritySource: 'default' });
+  if (action === 'edit') startEditing(id);
+  if (action === 'edit-cancel') stopEditing();
   if (action === 'reason') {
     openReasons.has(id) ? openReasons.delete(id) : openReasons.add(id);
     render();
   }
 });
 
+function startEditing(id) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  editing = { id, title: task.title, description: task.description || '', dueDate: task.dueDate || '' };
+  render();
+  const input = list.querySelector('.is-editing .item__edit');
+  input?.focus();
+  input?.select();
+}
+
+function stopEditing() {
+  const id = editing?.id;
+  editing = null;
+  render();
+  list.querySelector(`.item[data-id="${id}"] .badge--edit`)?.focus();
+}
+
+function saveEditing() {
+  const title = editing.title.trim();
+  if (!title) {
+    list.querySelector('.is-editing .item__edit')?.focus();
+    showToast('Название не может быть пустым', { error: true });
+    return;
+  }
+  const { id } = editing;
+  const description = editing.description.trim();
+  const dueDate = editing.dueDate;
+  editing = null;
+  // пустые поля удаляются из задачи: undefined не попадает в JSON
+  patch(id, { title, description: description || undefined, dueDate: dueDate || undefined });
+  showToast('Задача изменена');
+}
+
 list.addEventListener('dblclick', e => {
   const titleEl = e.target.closest('.item__title');
-  if (!titleEl) return;
-  const id = titleEl.closest('.item').dataset.id;
-  const input = el('input', { type: 'text', className: 'item__edit', value: titleEl.textContent, maxLength: 200 });
-  titleEl.replaceWith(input);
-  input.focus();
-  input.select();
+  if (titleEl) startEditing(titleEl.closest('.item').dataset.id);
+});
 
-  let finished = false;
-  const finish = save => {
-    if (finished) return;
-    finished = true;
-    const title = input.value.trim();
-    if (save && title) patch(id, { title });
-    else render();
-  };
-  input.addEventListener('keydown', ev => {
-    if (ev.key === 'Enter') finish(true);
-    if (ev.key === 'Escape') finish(false);
-  });
-  input.addEventListener('blur', () => finish(true));
+list.addEventListener('input', e => {
+  if (!editing || !e.target.closest('.is-editing')) return;
+  const { name, value } = e.target;
+  if (name in editing) editing[name] = value;
+});
+
+list.addEventListener('submit', e => {
+  if (!e.target.matches('.item__form')) return;
+  e.preventDefault();
+  saveEditing();
+});
+
+list.addEventListener('keydown', e => {
+  if (!editing || !e.target.closest('.is-editing')) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    stopEditing();
+  } else if (e.key === 'Enter' && e.target.matches('textarea') && !e.shiftKey) {
+    // в описании Enter тоже сохраняет, Shift+Enter — новая строка
+    e.preventDefault();
+    saveEditing();
+  }
 });
 
 filters.addEventListener('click', e => {

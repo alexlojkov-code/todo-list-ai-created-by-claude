@@ -387,6 +387,35 @@ select:focus-visible, input:focus-visible, button:focus-visible { outline: 2px s
 .badge--lock:hover { color: var(--red); }
 .badge--ai { color: var(--ink); text-decoration: underline; text-decoration-color: var(--red); text-underline-offset: 3px; }
 
+.badge--edit { color: var(--ink); }
+.badge--edit:hover { color: var(--red); }
+
+/* ---------- редактор задачи ---------- */
+
+.item.is-editing { border-top-color: var(--red); }
+.item__form { grid-column: 1 / -1; display: grid; gap: 14px; }
+.item__form .field input[type="date"] { width: auto; padding: 6px 0; font-size: 13px; }
+.item__textarea {
+  width: 100%;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+.item__textarea:focus { outline: none; border-bottom-color: var(--red); }
+.field--inline { display: flex; align-items: center; gap: 12px; }
+.item__form-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.item__form-actions { display: flex; gap: 8px; }
+.item__form-actions .btn { min-height: 40px; padding: 0 18px; font-size: 13px; }
+.btn--line { border-color: var(--ink); background: transparent; color: var(--ink); }
+.btn--line:hover { background: var(--ink); color: var(--on-ink); }
+.item__form-hint { margin: 0; font-size: 10px; color: var(--muted); letter-spacing: 0; }
+
 .item__reason {
   grid-column: 2 / 4;
   margin: 4px 0 0;
@@ -567,6 +596,9 @@ select:focus-visible, input:focus-visible, button:focus-visible { outline: 2px s
   .ai-hint { text-align: left; }
   .list { column-gap: 0; }
   .item__reason { grid-column: 1 / -1; }
+  .item__form-actions { width: 100%; }
+  .item__form-actions .btn { flex: 1; }
+  .item__form-hint { display: none; }
   .coords { display: none; }
   .dialog h2 { font-size: 36px; }
 }
