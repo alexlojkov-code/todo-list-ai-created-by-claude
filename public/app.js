@@ -175,21 +175,21 @@ function compare(a, b) {
 function renderEditor(task, index) {
   const form = el('form', { className: 'item__form', dataset: { action: 'edit-form' } }, [
     el('label', { className: 'field' }, [
-      el('span', { textContent: 'название' }),
-      el('input', { type: 'text', name: 'title', className: 'item__edit', value: editing.title, maxLength: 200, required: true }),
+      el('span', { className: 'field__label', textContent: 'Название' }),
+      el('input', { type: 'text', name: 'title', className: 'input item__edit', value: editing.title, maxLength: 200, required: true, enterKeyHint: 'done' }),
     ]),
     el('label', { className: 'field' }, [
-      el('span', { textContent: 'описание' }),
-      el('textarea', { name: 'description', className: 'item__textarea', value: editing.description, maxLength: 2000, rows: 2, placeholder: 'необязательно' }),
+      el('span', { className: 'field__label', textContent: 'Описание' }),
+      el('textarea', { name: 'description', className: 'textarea', value: editing.description, maxLength: 2000, rows: 2, placeholder: 'Необязательно' }),
     ]),
     el('div', { className: 'item__form-row' }, [
       el('label', { className: 'field field--inline' }, [
-        el('span', { textContent: 'срок' }),
-        el('input', { type: 'date', name: 'dueDate', value: editing.dueDate }),
+        el('span', { className: 'field__label', textContent: 'Срок' }),
+        el('input', { type: 'date', name: 'dueDate', className: 'input', value: editing.dueDate }),
       ]),
       el('div', { className: 'item__form-actions' }, [
-        el('button', { type: 'button', className: 'btn btn--line', textContent: 'Отмена', dataset: { action: 'edit-cancel' } }),
-        el('button', { type: 'submit', className: 'btn btn--dark' }, [icon('check'), 'Сохранить']),
+        el('button', { type: 'button', className: 'btn btn--secondary', textContent: 'Отмена', dataset: { action: 'edit-cancel' } }),
+        el('button', { type: 'submit', className: 'btn btn--primary' }, [icon('check'), 'Сохранить']),
       ]),
     ]),
     el('p', { className: 'item__form-hint', textContent: 'Enter — сохранить · Esc — отменить' }),
@@ -204,7 +204,7 @@ function renderTask(task, index) {
   if (editing?.id === task.id) return renderEditor(task, index);
   const overdue = task.dueDate && !task.done && task.dueDate < today();
 
-  const prio = el('select', { className: 'prio', title: 'Приоритет', dataset: { p: task.priority, action: 'priority' } },
+  const prio = el('select', { className: 'select select--sm prio', title: 'Приоритет', 'aria-label': 'Приоритет', dataset: { p: task.priority, action: 'priority' } },
     PRIORITIES.map(p => el('option', { value: p, textContent: PRIORITY_LABELS[p], selected: p === task.priority })));
 
   const meta = [prio];
@@ -239,7 +239,7 @@ function renderTask(task, index) {
 
   const children = [
     el('span', { className: 'item__num', textContent: `зад. ${String(index + 1).padStart(2, '0')}`, 'aria-hidden': 'true' }),
-    el('input', { type: 'checkbox', className: 'item__check', checked: task.done, dataset: { action: 'toggle' }, 'aria-label': 'Выполнено' }),
+    el('input', { type: 'checkbox', className: 'check item__check', checked: task.done, dataset: { action: 'toggle' }, 'aria-label': 'Выполнено' }),
     body,
     el('button', { type: 'button', className: 'item__del', dataset: { action: 'delete' }, 'aria-label': 'Удалить', title: 'Удалить' }, [icon('trash')]),
   ];
@@ -646,16 +646,58 @@ $('logout-btn').addEventListener('click', async () => {
 
 window.addEventListener('beforeunload', () => { Cloud.flush(); });
 
-// ---------- тема: авто → светлая → тёмная ----------
+// ---------- меню действий: открытие, клавиатура, закрытие по клику мимо ----------
+
+function setupMenu(button, menu, onSelect) {
+  const items = () => [...menu.querySelectorAll('[role^="menuitem"]')];
+  const outside = e => { if (!menu.contains(e.target) && !button.contains(e.target)) close(false); };
+  function open() {
+    menu.hidden = false;
+    button.setAttribute('aria-expanded', 'true');
+    (items().find(i => i.getAttribute('aria-checked') === 'true') || items()[0])?.focus();
+    document.addEventListener('pointerdown', outside, true);
+  }
+  function close(returnFocus = true) {
+    if (menu.hidden) return;
+    menu.hidden = true;
+    button.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('pointerdown', outside, true);
+    if (returnFocus) button.focus();
+  }
+  button.addEventListener('click', () => (menu.hidden ? open() : close()));
+  button.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); open(); }
+  });
+  menu.addEventListener('keydown', e => {
+    const list = items();
+    const i = list.indexOf(document.activeElement);
+    const move = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: list.length - 1 }[e.key];
+    if (move !== undefined) {
+      e.preventDefault();
+      list[(move + list.length) % list.length].focus();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      close();
+    } else if (e.key === 'Tab') {
+      close(false);
+    }
+  });
+  menu.addEventListener('click', e => {
+    const item = e.target.closest('[role^="menuitem"]');
+    if (!item) return;
+    onSelect(item);
+    setTimeout(() => close(), 80);
+  });
+  return { open, close };
+}
+
+// ---------- тема: светлая / тёмная / как в системе (меню «Вид») ----------
 
 const THEME_KEY = 'todo-list-ai.theme';
-const THEMES = {
-  auto: { icon: 'contrast', label: 'как в системе', title: 'Тема как в системе' },
-  light: { icon: 'sun', label: 'светлая', title: 'Светлая тема' },
-  dark: { icon: 'moon', label: 'тёмная', title: 'Тёмная тема' },
-};
-const NEXT_THEME = { auto: 'light', light: 'dark', dark: 'auto' };
-const themeBtn = $('theme-btn');
+const THEME_ICONS = { light: 'sun', dark: 'moon', auto: 'contrast' };
+const THEME_TITLES = { light: 'светлая', dark: 'тёмная', auto: 'как в системе' };
+const viewBtn = $('view-btn');
+const viewMenu = $('view-menu');
 const systemDark = matchMedia('(prefers-color-scheme: dark)');
 let themeMode = document.documentElement.dataset.themeMode || 'light';
 
@@ -663,15 +705,14 @@ function applyTheme() {
   const dark = themeMode === 'dark' || (themeMode === 'auto' && systemDark.matches);
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   document.documentElement.dataset.themeMode = themeMode;
-  const t = THEMES[themeMode];
-  themeBtn.querySelector('.theme-btn__icon use').setAttribute('href', `icons.svg#${t.icon}`);
-  themeBtn.querySelector('.theme-btn__label').textContent = t.label;
-  themeBtn.title = `${t.title}. Нажмите, чтобы сменить`;
-  themeBtn.setAttribute('aria-label', `Тема: ${t.label}. Сменить`);
+  $('view-icon').setAttribute('href', `icons.svg#${THEME_ICONS[themeMode]}`);
+  viewBtn.title = `Вид: тема — ${THEME_TITLES[themeMode]}`;
+  viewMenu.querySelectorAll('[data-theme-mode]').forEach(i => i.setAttribute('aria-checked', String(i.dataset.themeMode === themeMode)));
 }
 
-themeBtn.addEventListener('click', () => {
-  themeMode = NEXT_THEME[themeMode] || 'auto';
+setupMenu(viewBtn, viewMenu, item => {
+  if (!item.dataset.themeMode) return;
+  themeMode = item.dataset.themeMode;
   try { localStorage.setItem(THEME_KEY, themeMode); } catch {}
   applyTheme();
 });

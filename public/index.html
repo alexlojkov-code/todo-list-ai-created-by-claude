@@ -31,10 +31,17 @@
     <p class="topbar__clock" id="clock" aria-hidden="true"></p>
     <div class="topbar__right">
       <span class="tb-btn tb-btn--line ai-status" id="ai-status" data-state="loading">AI: проверка…</span>
-      <button type="button" class="tb-btn tb-btn--line theme-btn" id="theme-btn">
-        <svg class="icon theme-btn__icon" aria-hidden="true"><use href="icons.svg#sun"/></svg>
-        <span class="theme-btn__label">авто</span>
-      </button>
+      <div class="menu-wrap">
+        <button type="button" class="icon-btn" id="view-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu" aria-label="Вид" title="Вид: тема">
+          <svg class="icon" aria-hidden="true"><use id="view-icon" href="icons.svg#sun"/></svg>
+        </button>
+        <div class="menu" id="view-menu" role="menu" aria-label="Вид" hidden>
+          <p class="menu__label" role="presentation">Тема</p>
+          <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-theme-mode="light" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#sun"/></svg>Светлая</button>
+          <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-theme-mode="dark" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#moon"/></svg>Тёмная</button>
+          <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-theme-mode="auto" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#contrast"/></svg>Как в системе</button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -66,7 +73,7 @@
       <p class="label">нов. задача</p>
       <div class="add__row">
         <input class="add__title" id="add-title" type="text" placeholder="Что нужно сделать?" maxlength="200" required>
-        <button class="btn btn--dark" type="submit"><svg class="icon" aria-hidden="true"><use href="icons.svg#plus"/></svg>Добавить</button>
+        <button class="btn btn--primary btn--lg" type="submit"><svg class="icon" aria-hidden="true"><use href="icons.svg#plus"/></svg>Добавить</button>
       </div>
       <div class="add__row add__row--extra">
         <input class="add__desc" id="add-desc" type="text" placeholder="Описание — необязательно" maxlength="2000">
@@ -78,14 +85,14 @@
     </form>
 
     <div class="toolbar">
-      <nav class="filters" id="filters">
+      <nav class="filters segmented" id="filters" aria-label="Фильтр задач">
         <button type="button" data-filter="all" class="is-active">Все</button>
         <button type="button" data-filter="active">Активные</button>
         <button type="button" data-filter="done">Выполненные</button>
       </nav>
       <label class="sort">
         <span>сорт.</span>
-        <select id="sort">
+        <select id="sort" class="select select--sm">
           <option value="priority">по приоритету</option>
           <option value="due">по сроку</option>
           <option value="created">по дате создания</option>
@@ -94,7 +101,7 @@
     </div>
 
     <div class="ai-bar">
-      <button type="button" class="btn btn--ai" id="ai-btn" disabled>
+      <button type="button" class="btn btn--secondary btn--wide btn--lg" id="ai-btn" disabled>
         <span class="spinner" aria-hidden="true"></span>
         <span class="btn__label">Расставить приоритеты с AI</span>
         <svg class="icon" aria-hidden="true"><use href="icons.svg#sparkle"/></svg>
@@ -131,20 +138,20 @@
       </div>
       <form class="auth-form" id="auth-form" novalidate>
         <label class="field" id="name-field" hidden>
-          <span>Имя (необязательно)</span>
-          <input type="text" name="name" maxlength="60" autocomplete="name">
+          <span class="field__label">Имя (необязательно)</span>
+          <input class="input" type="text" name="name" maxlength="60" autocomplete="name">
         </label>
         <label class="field">
-          <span>Email</span>
-          <input type="email" name="email" required maxlength="254" autocomplete="email">
+          <span class="field__label">Email</span>
+          <input class="input" type="email" name="email" required maxlength="254" autocomplete="email" inputmode="email">
         </label>
         <label class="field">
-          <span>Пароль</span>
-          <input type="password" name="password" required minlength="10" maxlength="200" autocomplete="current-password">
+          <span class="field__label">Пароль</span>
+          <input class="input" type="password" name="password" required minlength="10" maxlength="200" autocomplete="current-password">
           <small class="field__hint" id="password-hint" hidden>Не короче 10 символов</small>
         </label>
         <p class="form-error" id="auth-error" role="alert"></p>
-        <button type="submit" class="btn btn--dark btn--wide" id="auth-submit">Войти</button>
+        <button type="submit" class="btn btn--primary btn--wide btn--lg" id="auth-submit">Войти</button>
       </form>
     </section>
 
@@ -157,16 +164,16 @@
         <summary>Сменить пароль</summary>
         <form class="auth-form" id="password-form" novalidate>
           <label class="field">
-            <span>Текущий пароль</span>
-            <input type="password" name="current" required autocomplete="current-password">
+            <span class="field__label">Текущий пароль</span>
+            <input class="input" type="password" name="current" required autocomplete="current-password">
           </label>
           <label class="field">
-            <span>Новый пароль</span>
-            <input type="password" name="next" required minlength="10" maxlength="200" autocomplete="new-password">
+            <span class="field__label">Новый пароль</span>
+            <input class="input" type="password" name="next" required minlength="10" maxlength="200" autocomplete="new-password">
             <small class="field__hint">Не короче 10 символов. Другие устройства выйдут из аккаунта.</small>
           </label>
           <p class="form-error" role="alert"></p>
-          <button type="submit" class="btn btn--dark btn--wide">Сменить пароль</button>
+          <button type="submit" class="btn btn--primary btn--wide">Сменить пароль</button>
         </form>
       </details>
 
@@ -175,15 +182,15 @@
         <form class="auth-form" id="delete-form" novalidate>
           <p class="dialog__lead">Аккаунт и все задачи на сервере будут удалены без возможности восстановления.</p>
           <label class="field">
-            <span>Пароль</span>
-            <input type="password" name="password" required autocomplete="current-password">
+            <span class="field__label">Пароль</span>
+            <input class="input" type="password" name="password" required autocomplete="current-password">
           </label>
           <p class="form-error" role="alert"></p>
           <button type="submit" class="btn btn--danger btn--wide">Удалить навсегда</button>
         </form>
       </details>
 
-      <button type="button" class="btn btn--ghost btn--wide" id="logout-btn">Выйти</button>
+      <button type="button" class="btn btn--secondary btn--wide" id="logout-btn">Выйти</button>
       <p class="dialog__note">После выхода задачи удаляются с этого устройства и остаются в аккаунте.</p>
     </section>
   </dialog>
