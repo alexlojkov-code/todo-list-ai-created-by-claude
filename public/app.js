@@ -239,7 +239,7 @@ function renderTask(task) {
     meta.push(el('span', { className: 'item__due' + (overdue ? ' is-overdue' : '') },
       overdue ? [icon('clock'), `просрочено · ${formatDue(task.dueDate)}`] : [formatDue(task.dueDate)]));
   }
-  if (task.deferredOn === today() && !task.done) meta.push(el('span', { className: 'item__deferred' }, [icon('later'), 'отложено на сегодня']));
+  if (task.deferredOn === today() && !task.done) meta.push(el('span', { className: 'item__deferred' + (justDeferred === task.id ? ' is-fresh' : '') }, [icon('later'), 'отложено на сегодня']));
   if (task.prioritySource === 'manual') {
     meta.push(el('button', {
       type: 'button', className: 'badge badge--lock',
@@ -315,6 +315,104 @@ function renderStats() {
   counter.textContent = parts.join(' · ');
   const counts = { all: tasks.length, active: active.length, done };
   filters.querySelectorAll('[data-count]').forEach(c => { c.textContent = counts[c.dataset.count] || ''; });
+}
+
+// ---------- движение (REDESIGN-PLAN.md, «Живость сайта») ----------
+
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const motion = () => document.documentElement.dataset.motion === 'off' ? 'off' : 'on';
+const DUR = 320;
+let justDeferred = null; // подпись «отложено» проявляется только у только что отложенной задачи
+
+function itemRects() {
+  const map = new Map();
+  for (const node of list.querySelectorAll('[data-id]')) {
+    const title = node.querySelector('.item__title');
+    map.set(node.dataset.id, { node, rect: node.getBoundingClientRect(), title: title?.getBoundingClientRect() });
+  }
+  return map;
+}
+
+// Перестановка строк (FLIP): строки сопоставляются по data-id, потому что render() каждый раз создаёт новые
+// элементы. Строка, которая исчезла из списка, на время анимации остаётся «призраком» на своём месте.
+// Данные к этому моменту уже записаны — анимация только оформляет результат.
+function animateListChange(update, { ghostClass = '' } = {}) {
+  if (motion() === 'off') return update();
+  const before = itemRects();
+  const result = update();
+  const run = () => {
+    const after = new Set();
+    for (const node of list.querySelectorAll('[data-id]')) {
+      const id = node.dataset.id;
+      after.add(id);
+      const prev = before.get(id);
+      if (!prev) {
+        node.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 200, easing: 'cubic-bezier(.2,.8,.2,1)' });
+        continue;
+      }
+      const now = node.getBoundingClientRect();
+      const dx = prev.rect.left - now.left;
+      const dy = prev.rect.top - now.top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      node.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: DUR, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    }
+    for (const [id, prev] of before) {
+      if (after.has(id)) continue;
+      const ghost = prev.node;
+      ghost.classList.add('is-ghost');
+      if (ghostClass) ghost.classList.add(ghostClass);
+      Object.assign(ghost.style, { position: 'fixed', left: `${prev.rect.left}px`, top: `${prev.rect.top}px`, width: `${prev.rect.width}px`, height: `${prev.rect.height}px`, margin: '0', zIndex: '5', pointerEvents: 'none' });
+      document.body.append(ghost);
+      ghost.animate([{ opacity: 1, transform: 'none' }, { opacity: 1, transform: 'none', offset: .45 }, { opacity: 0, transform: 'translateY(-8px) scale(.98)' }], { duration: 520, easing: 'cubic-bezier(.2,.8,.2,1)' })
+        .finished.finally(() => ghost.remove());
+    }
+  };
+  if (result && typeof result.then === 'function') return result.then(v => { run(); return v; });
+  run();
+  return result;
+}
+
+// Перелёт задачи при смене режима: двигается только название текущей задачи, остальное мягко проявляется.
+function animateViewChange(update) {
+  if (motion() === 'off') return update();
+  const before = itemRects();
+  update();
+  const nowTitle = list.querySelector('.now .item__title');
+  const id = nowTitle?.closest('[data-id]')?.dataset.id;
+  const prev = id && before.get(id)?.title;
+  for (const node of list.children) node.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
+  if (prev && nowTitle) {
+    const now = nowTitle.getBoundingClientRect();
+    const scale = prev.height / now.height;
+    nowTitle.style.transformOrigin = 'top left';
+    nowTitle.animate([{ transform: `translate(${prev.left - now.left}px, ${prev.top - now.top}px) scale(${scale})` }, { transform: 'none' }],
+      { duration: DUR, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  }
+}
+
+// Разделы ниже первого экрана проявляются при первой прокрутке к ним — один раз за загрузку страницы.
+const revealed = new Set();
+const revealObserver = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
+  for (const entry of entries) {
+    if (!entry.isIntersecting) continue;
+    entry.target.classList.add('is-visible');
+    revealed.add(entry.target.dataset.reveal);
+    revealObserver.unobserve(entry.target);
+  }
+}, { rootMargin: '0px 0px -10% 0px', threshold: 0.1 }) : null;
+
+function revealSections() {
+  revealObserver?.disconnect();
+  for (const node of list.querySelectorAll('.group__title, .group__toggle')) {
+    const key = `${view}:${node.textContent.replace(/\d+/g, '').trim()}`;
+    node.dataset.reveal = key;
+    if (!revealObserver || motion() === 'off' || revealed.has(key) || node.getBoundingClientRect().top < innerHeight) {
+      revealed.add(key);
+      continue;
+    }
+    node.classList.add('reveal');
+    revealObserver.observe(node);
+  }
 }
 
 // ---------- режим «Фокус» ----------
@@ -400,6 +498,7 @@ function render() {
     empty.hidden = true;
     renderStats();
     renderAi();
+    revealSections();
     return;
   }
   const visible = tasks
@@ -439,6 +538,7 @@ function render() {
   empty.hidden = visible.length > 0;
   empty.textContent = tasks.length ? 'В этом фильтре пусто' : 'Добавьте первое дело — оно появится здесь';
   renderAi();
+  revealSections();
 }
 
 function aiCandidates() {
@@ -469,6 +569,10 @@ function showToast(text, { undo = false, error = false } = {}) {
   toastUndo.hidden = !undo;
   toast.classList.toggle('is-error', error);
   toast.hidden = false;
+  const timer = $('toast-timer');
+  timer.hidden = !undo;
+  timer.getAnimations().forEach(a => a.cancel());
+  if (undo && motion() === 'on') timer.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], { duration: UNDO_MS, easing: 'linear', fill: 'forwards' });
   toastTimer = setTimeout(hideToast, undo ? UNDO_MS : 5000);
 }
 
@@ -489,7 +593,7 @@ function removeWithUndo(ids, message) {
   undoAction = () => {
     const now = new Date().toISOString();
     for (const t of removed) delete deleted[t.id];
-    commit([...tasks.filter(t => !ids.includes(t.id)), ...removed.map(t => ({ ...t, updatedAt: now }))]);
+    animateListChange(() => commit([...tasks.filter(t => !ids.includes(t.id)), ...removed.map(t => ({ ...t, updatedAt: now }))]));
     showToast(removed.length > 1 ? 'Задачи восстановлены' : 'Задача восстановлена');
   };
 }
@@ -612,7 +716,10 @@ dueInput.addEventListener('input', syncChips);
 list.addEventListener('change', e => {
   const id = e.target.closest('.item')?.dataset.id;
   if (!id) return;
-  if (e.target.dataset.action === 'toggle') patch(id, { done: e.target.checked });
+  if (e.target.dataset.action === 'toggle') {
+    const done = e.target.checked;
+    animateListChange(() => patch(id, { done }), { ghostClass: done ? 'is-completing' : '' });
+  }
   if (e.target.dataset.action === 'priority') patch(id, { priority: e.target.value, prioritySource: 'manual' });
 });
 
@@ -628,13 +735,24 @@ list.addEventListener('click', e => {
   if (!id) return;
   if (action === 'delete') {
     if (editing?.id === id) editing = null;
-    removeWithUndo([id], 'Задача удалена');
+    animateListChange(() => removeWithUndo([id], 'Задача удалена'));
   }
   if (action === 'unlock') patch(id, { prioritySource: 'default' });
-  if (action === 'complete') { patch(id, { done: true }); showToast('Готово'); }
+  if (action === 'complete') {
+    animateListChange(() => patch(id, { done: true }), { ghostClass: 'is-completing' });
+    showToast('Готово');
+  }
   // «Отложить» — в конец очереди до конца местного дня; срок не меняется
-  if (action === 'defer') { patch(id, { deferredOn: today(), deferredSeq: new Date().toISOString(), pinnedAt: undefined }); showToast('Отложено в конец очереди'); }
-  if (action === 'pin') { patch(id, { pinnedAt: new Date().toISOString(), deferredOn: undefined }); showToast(view === 'focus' ? 'Теперь это дело — сейчас' : 'Дело закреплено как «сейчас» в режиме «Фокус»'); }
+  if (action === 'defer') {
+    justDeferred = id;
+    setTimeout(() => { if (justDeferred === id) justDeferred = null; }, 1500);
+    animateListChange(() => patch(id, { deferredOn: today(), deferredSeq: new Date().toISOString(), pinnedAt: undefined }));
+    showToast('Отложено в конец очереди');
+  }
+  if (action === 'pin') {
+    animateListChange(() => patch(id, { pinnedAt: new Date().toISOString(), deferredOn: undefined }));
+    showToast(view === 'focus' ? 'Теперь это дело — сейчас' : 'Дело закреплено как «сейчас» в режиме «Фокус»');
+  }
   if (action === 'edit') startEditing(id);
   if (action === 'edit-cancel') stopEditing();
   if (action === 'reason') {
@@ -719,7 +837,7 @@ $('view-switch').addEventListener('click', e => {
   view = btn.dataset.view;
   try { localStorage.setItem(VIEW_KEY, view); } catch {}
   editing = null;
-  render();
+  animateViewChange(render);
 });
 
 sortSelect.addEventListener('change', () => {
@@ -729,10 +847,10 @@ sortSelect.addEventListener('change', () => {
 
 clearDone.addEventListener('click', () => {
   const ids = tasks.filter(t => t.done).map(t => t.id);
-  removeWithUndo(ids, `Удалено ${ids.length} ${plural(ids.length, 'готовое дело', 'готовых дела', 'готовых дел')}`);
+  animateListChange(() => removeWithUndo(ids, `Удалено ${ids.length} ${plural(ids.length, 'готовое дело', 'готовых дела', 'готовых дел')}`));
 });
 
-aiBtn.addEventListener('click', prioritize);
+aiBtn.addEventListener('click', () => animateListChange(prioritize));
 
 toastUndo.addEventListener('click', () => {
   if (undoAction) {
@@ -1001,7 +1119,22 @@ function applyTheme() {
   viewMenu.querySelectorAll('[data-theme-mode]').forEach(i => i.setAttribute('aria-checked', String(i.dataset.themeMode === themeMode)));
 }
 
+const MOTION_KEY = 'todo-list-ai.motion';
+function applyMotion() {
+  const choice = document.documentElement.dataset.motionChoice || 'on';
+  document.documentElement.dataset.motion = reducedMotion.matches ? 'off' : choice;
+  viewMenu.querySelectorAll('[data-motion]').forEach(i => i.setAttribute('aria-checked', String(i.dataset.motion === choice)));
+  $('motion-note').hidden = !reducedMotion.matches;
+}
+reducedMotion.addEventListener('change', applyMotion);
+
 setupMenu(viewBtn, viewMenu, item => {
+  if (item.dataset.motion) {
+    document.documentElement.dataset.motionChoice = item.dataset.motion;
+    try { localStorage.setItem(MOTION_KEY, item.dataset.motion); } catch {}
+    applyMotion();
+    return;
+  }
   if (!item.dataset.themeMode) return;
   themeMode = item.dataset.themeMode;
   try { localStorage.setItem(THEME_KEY, themeMode); } catch {}
@@ -1009,6 +1142,7 @@ setupMenu(viewBtn, viewMenu, item => {
 });
 systemDark.addEventListener('change', () => { if (themeMode === 'auto') applyTheme(); });
 applyTheme();
+applyMotion();
 
 // линия под шапкой появляется, когда страница прокручена
 const topbar = document.querySelector('.topbar');

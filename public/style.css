@@ -822,3 +822,64 @@ details.block > .auth-form { padding: var(--space-2) 0 var(--space-5); }
 .block__button { border-bottom: 1px solid var(--c-divider); }
 @media (hover: hover) { .block__summary:hover { background: var(--c-linen); } }
 .form-error .icon, .field__error .icon { width: 16px; height: 16px; }
+
+/* =====================================================================
+   Движение (REDESIGN-PLAN.md, «Живость сайта»).
+   Анимируются только opacity, transform и цвет. При data-motion="off" или системной
+   настройке «Уменьшить движение» всё меняется мгновенно.
+   ===================================================================== */
+
+/* отметка «готово»: круг заливается, галочка появляется */
+.check::after { transform: scale(.6); transition: opacity var(--dur-fast) var(--ease), transform var(--dur-base) var(--ease); }
+.check:checked::after { transform: scale(1); }
+
+/* «призрак» строки, которая уходит из списка; при выполнении — зачёркивание слева направо */
+.is-ghost { box-shadow: var(--shadow-2); }
+.is-completing .item__title, .is-completing .now__text {
+  background: linear-gradient(currentColor, currentColor) left 55% / 0 1px no-repeat;
+  animation: strike var(--dur-base) var(--ease) forwards;
+  color: var(--c-text-2);
+}
+@keyframes strike { to { background-size: 100% 1px; } }
+
+/* подпись «отложено» проявляется после того, как задача доехала */
+.item__deferred.is-fresh { animation: fade-in var(--dur-base) var(--ease) var(--dur-slow) both; }
+@keyframes fade-in { from { opacity: 0; } }
+
+/* появление разделов при прокрутке */
+html[data-motion="on"] .reveal { opacity: 0; transform: translateY(12px); transition: opacity var(--dur-slow) var(--ease), transform var(--dur-slow) var(--ease); }
+html[data-motion="on"] .reveal.is-visible { opacity: 1; transform: none; }
+
+/* строка «Добавить дело»: плюс поворачивается, форма раскрывается */
+.composer__form:not([hidden]) { animation: rise var(--dur-base) var(--ease); }
+@keyframes rise { from { opacity: 0; transform: translateY(-4px); } }
+
+/* уведомление и полоса оставшегося времени для «Отменить» */
+.toast:not([hidden]) { animation: toast-in var(--dur-base) var(--ease); }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 12px); } }
+.toast__timer { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--c-toast-link); opacity: .7; transform-origin: left; }
+.toast__timer[hidden] { display: none; }
+
+/* ошибка в поле: однократный едва заметный сдвиг */
+.input[aria-invalid="true"] { animation: nudge 240ms var(--ease); }
+@keyframes nudge { 25% { transform: translateX(-4px); } 50% { transform: translateX(3px); } 75% { transform: translateX(-2px); } }
+
+/* смена темы: цвета меняются плавно */
+body, .topbar, .item, .group__list, .composer__form, .now, .dialog, .segmented, .input, .select, .textarea {
+  transition-property: background-color, color, border-color, box-shadow;
+  transition-duration: var(--dur-base);
+  transition-timing-function: var(--ease);
+}
+
+.menu__note { margin: 4px 12px 8px; max-width: 220px; font-size: var(--fs-caption); color: var(--c-text-2); }
+.menu__note[hidden] { display: none; }
+
+/* выключенные анимации и системное «Уменьшить движение» */
+html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="off"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+}

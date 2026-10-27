@@ -17,6 +17,12 @@
       var dark = mode === 'dark' || (mode === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
       document.documentElement.dataset.themeMode = mode;
+      // анимации: выбор пользователя, но системная настройка «Уменьшить движение» важнее
+      var motion = 'on';
+      try { motion = localStorage.getItem('todo-list-ai.motion') === 'off' ? 'off' : 'on'; } catch (e) {}
+      document.documentElement.dataset.motionChoice = motion;
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) motion = 'off';
+      document.documentElement.dataset.motion = motion;
     })();
   </script>
   <link rel="stylesheet" href="style.css">
@@ -35,6 +41,11 @@
             <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-theme-mode="light" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#sun"/></svg>Светлая</button>
             <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-theme-mode="dark" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#moon"/></svg>Тёмная</button>
             <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-theme-mode="auto" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#contrast"/></svg>Как в системе</button>
+            <div class="menu__sep" role="separator"></div>
+            <p class="menu__label" role="presentation">Анимации</p>
+            <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-motion="on" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#sparkle"/></svg>Включены</button>
+            <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-motion="off" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#close"/></svg>Выключены</button>
+            <p class="menu__note" id="motion-note" hidden>В системе включено «Уменьшить движение» — крупных перемещений не будет.</p>
           </div>
         </div>
         <button type="button" class="icon-btn account-btn" id="account-btn" hidden>
@@ -129,6 +140,7 @@
   <div class="toast" id="toast" role="status" hidden>
     <svg class="icon toast__icon" aria-hidden="true"><use id="toast-icon" href="icons.svg#check"/></svg>
     <span id="toast-text"></span>
+    <span class="toast__timer" id="toast-timer" aria-hidden="true"></span>
     <button type="button" class="link link--light" id="toast-undo" hidden>Отменить</button>
   </div>
 
