@@ -758,6 +758,7 @@ const accountBtn = $('account-btn');
 const accountLabel = $('account-label');
 const syncDot = $('sync');
 const dialog = $('account-dialog');
+const deleteDialog = $('delete-dialog');
 const authForm = $('auth-form');
 const authError = $('auth-error');
 const authSubmit = $('auth-submit');
@@ -765,49 +766,92 @@ const SYNC_TEXT = {
   off: '',
   synced: 'Задачи синхронизированы',
   saving: 'Сохраняем изменения…',
-  offline: 'Нет связи — изменения отправятся позже',
+  offline: 'Нет связи — отправим, когда появится',
   error: 'Не удалось сохранить, повторим через 30 секунд',
+};
+const SYNC_ICON = { synced: 'check', saving: 'cloud', offline: 'cloud', error: 'alert', off: 'cloud' };
+// коды ошибок сервера, которые относятся к конкретному полю
+const FIELD_ERRORS = {
+  INVALID_EMAIL: 'email', EMAIL_TAKEN: 'email',
+  PASSWORD_TOO_SHORT: 'password', PASSWORD_TOO_LONG: 'password', PASSWORD_WEAK: 'password',
 };
 let authMode = 'login';
 let accountReady = false; // пока аккаунт загружается, не просим войти
 
+function syncedAgo() {
+  const at = Cloud.meta.syncedAt;
+  if (!at) return '';
+  const min = Math.round((Date.now() - at) / 60000);
+  return min < 1 ? ' · только что' : ` · ${min} мин назад`;
+}
+
 function renderAccount() {
   accountBtn.hidden = !Cloud.available;
   const user = Cloud.user;
-  accountLabel.textContent = user ? (user.name || user.email) : 'Войти';
+  accountLabel.textContent = user ? `Аккаунт: ${user.email}` : 'Войти';
+  accountBtn.setAttribute('aria-label', user ? `Аккаунт: ${user.email}` : 'Войти или зарегистрироваться');
   syncDot.dataset.state = user ? Cloud.status : 'off';
   accountBtn.title = user ? `${user.email}${SYNC_TEXT[Cloud.status] ? ' · ' + SYNC_TEXT[Cloud.status] : ''}` : 'Войти или зарегистрироваться';
   $('guest-view').hidden = !!user;
   $('user-view').hidden = !user;
   if (user) {
+    $('user-name').textContent = user.name || 'Аккаунт';
     $('user-email').textContent = user.email;
-    $('sync-text').textContent = SYNC_TEXT[Cloud.status] || '';
+    const state = Cloud.status === 'off' ? 'synced' : Cloud.status;
+    $('sync-card').dataset.state = state;
+    $('sync-icon').setAttribute('href', `icons.svg#${SYNC_ICON[state]}`);
+    $('sync-text').textContent = (SYNC_TEXT[state] || '') + (state === 'synced' ? syncedAgo() : '');
   }
   renderAi();
 }
 
+function clearFieldErrors(formEl) {
+  formEl.querySelectorAll('[aria-invalid]').forEach(i => i.removeAttribute('aria-invalid'));
+  formEl.querySelectorAll('.field__error').forEach(e => { e.textContent = ''; });
+  const general = formEl.querySelector('.form-error');
+  if (general) general.textContent = '';
+}
+
+function showFieldError(formEl, name, message) {
+  const input = formEl.elements.namedItem(name);
+  const slot = formEl.querySelector(`[data-error-for="${name}"]`);
+  if (!input || !slot) return false;
+  input.setAttribute('aria-invalid', 'true');
+  slot.replaceChildren(icon('alert'), message);
+  input.focus();
+  return true;
+}
+
 function setAuthMode(mode) {
   authMode = mode;
-  dialog.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('is-active', b.dataset.mode === mode));
+  dialog.querySelectorAll('.tabs button').forEach(b => {
+    b.classList.toggle('is-active', b.dataset.mode === mode);
+    b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+  });
+  $('account-title').textContent = mode === 'register' ? 'Регистрация' : 'Вход';
   $('name-field').hidden = mode !== 'register';
   $('password-hint').hidden = mode !== 'register';
   authForm.password.autocomplete = mode === 'register' ? 'new-password' : 'current-password';
-  authSubmit.textContent = mode === 'register' ? 'Зарегистрироваться' : 'Войти';
-  authError.textContent = '';
+  setPasswordVisible(false);
+  authSubmit.querySelector('.btn__label').textContent = mode === 'register' ? 'Зарегистрироваться' : 'Войти';
+  clearFieldErrors(authForm);
 }
 
-// Выполняет действие формы: блокирует кнопку и показывает ошибку под формой.
+// Выполняет действие формы: блокирует кнопку, ошибку показывает у поля или общим сообщением.
 async function runForm(formEl, action) {
   const btn = formEl.querySelector('button[type="submit"]');
-  const errorEl = formEl.querySelector('.form-error');
-  errorEl.textContent = '';
+  clearFieldErrors(formEl);
   btn.classList.add('is-loading');
   try {
     await action();
     formEl.reset();
     return true;
   } catch (err) {
-    errorEl.textContent = err.message || 'Что-то пошло не так';
+    const field = FIELD_ERRORS[err.code];
+    if (!field || !showFieldError(formEl, field, err.message)) {
+      const general = formEl.querySelector('.form-error');
+      if (general) general.replaceChildren(icon('alert'), err.message || 'Что-то пошло не так');
+    }
     return false;
   } finally {
     btn.classList.remove('is-loading');
@@ -816,26 +860,35 @@ async function runForm(formEl, action) {
 
 accountBtn.addEventListener('click', () => {
   setAuthMode(authMode);
+  renderAccount();
   dialog.showModal();
 });
 $('dialog-close').addEventListener('click', () => dialog.close());
-dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
+for (const d of [dialog, deleteDialog]) d.addEventListener('click', e => { if (e.target === d) d.close(); });
 dialog.querySelector('.tabs').addEventListener('click', e => {
   const btn = e.target.closest('button[data-mode]');
   if (btn) setAuthMode(btn.dataset.mode);
 });
 
+function setPasswordVisible(show) {
+  const btn = $('password-toggle');
+  authForm.password.type = show ? 'text' : 'password';
+  btn.setAttribute('aria-pressed', String(show));
+  btn.setAttribute('aria-label', show ? 'Скрыть пароль' : 'Показать пароль');
+  btn.title = btn.getAttribute('aria-label');
+  $('password-toggle-icon').setAttribute('href', `icons.svg#${show ? 'eye-off' : 'eye'}`);
+}
+$('password-toggle').addEventListener('click', () => setPasswordVisible(authForm.password.type === 'password'));
+
 authForm.addEventListener('submit', async e => {
   e.preventDefault();
+  clearFieldErrors(authForm);
   const email = authForm.email.value.trim();
   const password = authForm.password.value;
-  if (!email || !password) {
-    authError.textContent = 'Введите email и пароль';
-    return;
-  }
+  if (!email) return showFieldError(authForm, 'email', 'Введите email');
+  if (!password) return showFieldError(authForm, 'password', 'Введите пароль');
   if (authMode === 'register' && password.length < 10) {
-    authError.textContent = 'Пароль должен быть не короче 10 символов';
-    return;
+    return showFieldError(authForm, 'password', 'Пароль должен быть не короче 10 символов');
   }
   const ok = await runForm(authForm, async () => {
     const user = authMode === 'register'
@@ -844,6 +897,7 @@ authForm.addEventListener('submit', async e => {
     showToast(authMode === 'register' ? `Аккаунт создан: ${user.email}` : `Вы вошли как ${user.email}`);
   });
   if (ok) {
+    setPasswordVisible(false);
     renderAccount();
     dialog.close();
   }
@@ -858,11 +912,18 @@ $('password-form').addEventListener('submit', async e => {
   }
 });
 
+// удаление аккаунта — собственным окном подтверждения вместо системного confirm()
+$('delete-open').addEventListener('click', () => {
+  clearFieldErrors($('delete-form'));
+  deleteDialog.showModal();
+  $('delete-form').password.focus();
+});
+$('delete-cancel').addEventListener('click', () => deleteDialog.close());
 $('delete-form').addEventListener('submit', async e => {
   e.preventDefault();
   const f = e.currentTarget;
-  if (!confirm('Удалить аккаунт и все задачи на сервере? Это нельзя отменить.')) return;
   if (await runForm(f, () => Cloud.deleteAccount(f.password.value))) {
+    deleteDialog.close();
     dialog.close();
     showToast('Аккаунт удалён');
   }
@@ -957,4 +1018,9 @@ onScroll();
 
 render();
 checkAi();
-Cloud.init().finally(() => { accountReady = true; renderAi(); });
+Cloud.init().finally(() => {
+  accountReady = true;
+  renderAi();
+  // первый визит: задач нет — сразу открытая форма с курсором в поле названия
+  if (!tasks.length) setComposer(true);
+});
