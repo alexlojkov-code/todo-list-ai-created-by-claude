@@ -7,12 +7,13 @@
   <meta name="description" content="Список дел с AI-приоритезацией задач">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Oswald:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Tenor+Sans&display=swap">
   <script>
-    // Тема до первой отрисовки, чтобы не было вспышки светлого экрана
+    // Тема до первой отрисовки, чтобы не было вспышки. Новым посетителям — светлая,
+    // сохранённый выбор (в том числе «как в системе») не меняется.
     (function () {
-      var mode = 'auto';
-      try { mode = localStorage.getItem('todo-list-ai.theme') || 'auto'; } catch (e) {}
+      var mode = 'light';
+      try { mode = localStorage.getItem('todo-list-ai.theme') || 'light'; } catch (e) {}
       var dark = mode === 'dark' || (mode === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
       document.documentElement.dataset.themeMode = mode;

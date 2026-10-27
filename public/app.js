@@ -644,7 +644,7 @@ const THEMES = {
 const NEXT_THEME = { auto: 'light', light: 'dark', dark: 'auto' };
 const themeBtn = $('theme-btn');
 const systemDark = matchMedia('(prefers-color-scheme: dark)');
-let themeMode = document.documentElement.dataset.themeMode || 'auto';
+let themeMode = document.documentElement.dataset.themeMode || 'light';
 
 function applyTheme() {
   const dark = themeMode === 'dark' || (themeMode === 'auto' && systemDark.matches);
