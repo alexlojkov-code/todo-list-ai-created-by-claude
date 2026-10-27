@@ -1,7 +1,7 @@
 const STORAGE_KEY = 'todo-list-ai';
 const DELETED_KEY = 'todo-list-ai.deleted';
 const PRIORITIES = ['critical', 'high', 'medium', 'low'];
-const PRIORITY_LABELS = { critical: 'Критичный', high: 'Высокий', medium: 'Средний', low: 'Низкий' };
+const PRIORITY_LABELS = { critical: 'Срочно', high: 'Высокий', medium: 'Обычный', low: 'Низкий' };
 const MAX_AI_TASKS = 50;
 const UNDO_MS = 10000;
 
@@ -16,7 +16,6 @@ const counter = $('counter');
 const filters = $('filters');
 const sortSelect = $('sort');
 const clearDone = $('clear-done');
-const aiStatus = $('ai-status');
 const aiBtn = $('ai-btn');
 const aiHint = $('ai-hint');
 const toast = $('toast');
@@ -35,6 +34,8 @@ let toastTimer = null;
 const openReasons = new Set();
 // Редактируемая задача и черновик полей: черновик переживает перерисовку (например, при синхронизации)
 let editing = null; // { id, title, description, dueDate }
+let doneOpen = false; // раскрыта ли группа «Готово»
+let undoAction = null; // отмена последнего удаления (уведомление «Отменить»)
 
 // ---------- хранение ----------
 
@@ -172,100 +173,183 @@ function compare(a, b) {
 
 // ---------- отрисовка ----------
 
-function renderEditor(task, index) {
+const DAY_MS = 86400000;
+const WEEKDAY_DATE = { weekday: 'long', day: 'numeric', month: 'long' };
+
+function addDays(n) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Отметка приоритета формой, а не только цветом: низкий — полый кружок, обычный — без отметки,
+// высокий — залитая точка, срочно — точка «Кирпич» и слово «срочно».
+function priorityMark(task) {
+  if (task.priority === 'medium') return null;
+  const mark = el('span', { className: 'prio-mark', dataset: { p: task.priority }, title: `Приоритет: ${PRIORITY_LABELS[task.priority].toLowerCase()}` });
+  if (task.priority === 'critical') mark.append(el('span', { className: 'prio-mark__text', textContent: 'срочно' }));
+  else mark.append(el('span', { className: 'sr-only', textContent: `приоритет ${PRIORITY_LABELS[task.priority].toLowerCase()}` }));
+  return mark;
+}
+
+function renderEditor(task) {
+  const priority = el('select', { className: 'select prio', name: 'priority', 'aria-label': 'Приоритет', dataset: { action: 'priority' } },
+    ['low', 'medium', 'high', 'critical'].map(p => el('option', { value: p, textContent: PRIORITY_LABELS[p], selected: p === task.priority })));
   const form = el('form', { className: 'item__form', dataset: { action: 'edit-form' } }, [
     el('label', { className: 'field' }, [
       el('span', { className: 'field__label', textContent: 'Название' }),
-      el('input', { type: 'text', name: 'title', className: 'input item__edit', value: editing.title, maxLength: 200, required: true, enterKeyHint: 'done' }),
+      el('input', { type: 'text', name: 'title', className: 'input input--title item__edit', value: editing.title, maxLength: 200, required: true, enterKeyHint: 'done' }),
     ]),
     el('label', { className: 'field' }, [
       el('span', { className: 'field__label', textContent: 'Описание' }),
       el('textarea', { name: 'description', className: 'textarea', value: editing.description, maxLength: 2000, rows: 2, placeholder: 'Необязательно' }),
     ]),
-    el('div', { className: 'item__form-row' }, [
-      el('label', { className: 'field field--inline' }, [
+    el('div', { className: 'composer__row' }, [
+      el('label', { className: 'field' }, [
         el('span', { className: 'field__label', textContent: 'Срок' }),
-        el('input', { type: 'date', name: 'dueDate', className: 'input', value: editing.dueDate }),
+        el('input', { type: 'date', name: 'dueDate', className: 'input input--date', value: editing.dueDate }),
       ]),
-      el('div', { className: 'item__form-actions' }, [
-        el('button', { type: 'button', className: 'btn btn--secondary', textContent: 'Отмена', dataset: { action: 'edit-cancel' } }),
-        el('button', { type: 'submit', className: 'btn btn--primary' }, [icon('check'), 'Сохранить']),
+      el('label', { className: 'field field--priority' }, [
+        el('span', { className: 'field__label', textContent: 'Приоритет' }),
+        priority,
       ]),
     ]),
-    el('p', { className: 'item__form-hint', textContent: 'Enter — сохранить · Esc — отменить' }),
+    el('div', { className: 'item__form-actions' }, [
+      el('button', { type: 'button', className: 'btn btn--quiet btn--danger-text', dataset: { action: 'delete' } }, [icon('trash'), 'Удалить']),
+      el('span', { className: 'spacer' }),
+      el('button', { type: 'button', className: 'btn btn--secondary', textContent: 'Отмена', dataset: { action: 'edit-cancel' } }),
+      el('button', { type: 'submit', className: 'btn btn--primary' }, [icon('check'), 'Сохранить']),
+    ]),
+    el('p', { className: 'item__form-hint', textContent: 'Enter — сохранить · Shift+Enter — новая строка в описании · Esc — отменить' }),
   ]);
-  return el('li', { className: 'item is-editing', dataset: { id: task.id } }, [
-    el('span', { className: 'item__num', textContent: `ред. ${String(index + 1).padStart(2, '0')}`, 'aria-hidden': 'true' }),
-    form,
-  ]);
+  return el('li', { className: 'item is-editing', dataset: { id: task.id } }, [form]);
 }
 
-function renderTask(task, index) {
-  if (editing?.id === task.id) return renderEditor(task, index);
+function renderTask(task) {
+  if (editing?.id === task.id) return renderEditor(task);
   const overdue = task.dueDate && !task.done && task.dueDate < today();
 
-  const prio = el('select', { className: 'select select--sm prio', title: 'Приоритет', 'aria-label': 'Приоритет', dataset: { p: task.priority, action: 'priority' } },
-    PRIORITIES.map(p => el('option', { value: p, textContent: PRIORITY_LABELS[p], selected: p === task.priority })));
-
-  const meta = [prio];
+  const meta = [];
+  const mark = priorityMark(task);
+  if (mark) meta.push(mark);
+  if (task.dueDate) {
+    meta.push(el('span', { className: 'item__due' + (overdue ? ' is-overdue' : '') },
+      overdue ? [icon('clock'), `просрочено · ${formatDue(task.dueDate)}`] : [formatDue(task.dueDate)]));
+  }
   if (task.prioritySource === 'manual') {
     meta.push(el('button', {
       type: 'button', className: 'badge badge--lock',
-      title: 'Закреплено вручную, AI не изменит. Нажмите, чтобы снять закрепление', dataset: { action: 'unlock' },
+      title: 'Приоритет закреплён вручную, AI его не изменит. Нажмите, чтобы снять закрепление', dataset: { action: 'unlock' },
     }, [icon('pin'), 'закреплено']));
-  } else if (task.prioritySource === 'ai') {
+  } else if (task.prioritySource === 'ai' && task.aiReason) {
     meta.push(el('button', {
-      type: 'button', className: 'badge badge--ai', textContent: openReasons.has(task.id) ? 'скрыть обоснование' : 'почему так — AI',
-      title: task.aiReason || 'Приоритет от AI', dataset: { action: 'reason' },
-      'aria-expanded': String(openReasons.has(task.id)),
-    }));
-  }
-  meta.push(el('button', {
-    type: 'button', className: 'badge badge--edit',
-    title: 'Изменить название, описание и срок', dataset: { action: 'edit' },
-  }, [icon('pencil'), 'изменить']));
-  if (task.dueDate) {
-    meta.push(el('span', {
-      className: 'item__due' + (overdue ? ' is-overdue' : ''),
-      textContent: (overdue ? 'просрочено: ' : 'срок: ') + formatDue(task.dueDate),
-    }));
+      type: 'button', className: 'badge badge--ai', dataset: { action: 'reason' },
+      'aria-expanded': String(openReasons.has(task.id)), title: 'Почему такой приоритет',
+    }, [icon('sparkle'), openReasons.has(task.id) ? 'скрыть' : 'почему']));
   }
 
   const body = el('div', { className: 'item__body' }, [
     el('div', { className: 'item__title', textContent: task.title, title: 'Дважды щёлкните, чтобы изменить' }),
     ...(task.description ? [el('p', { className: 'item__desc', textContent: task.description })] : []),
-    el('div', { className: 'item__meta' }, meta),
+    ...(meta.length ? [el('div', { className: 'item__meta' }, meta)] : []),
+    ...(task.prioritySource === 'ai' && task.aiReason && openReasons.has(task.id)
+      ? [el('p', { className: 'item__reason' }, [icon('sparkle'), task.aiReason])] : []),
   ]);
 
-  const children = [
-    el('span', { className: 'item__num', textContent: `зад. ${String(index + 1).padStart(2, '0')}`, 'aria-hidden': 'true' }),
-    el('input', { type: 'checkbox', className: 'check item__check', checked: task.done, dataset: { action: 'toggle' }, 'aria-label': 'Выполнено' }),
-    body,
-    el('button', { type: 'button', className: 'item__del', dataset: { action: 'delete' }, 'aria-label': 'Удалить', title: 'Удалить' }, [icon('trash')]),
-  ];
-  if (task.prioritySource === 'ai' && task.aiReason) {
-    children.push(el('p', { className: 'item__reason', textContent: task.aiReason, hidden: !openReasons.has(task.id) }));
-  }
+  const actions = el('div', { className: 'item__actions' }, [
+    el('button', { type: 'button', className: 'icon-btn', dataset: { action: 'edit' }, 'aria-label': `Изменить «${task.title}»`, title: 'Изменить' }, [icon('pencil')]),
+    el('button', { type: 'button', className: 'icon-btn icon-btn--danger', dataset: { action: 'delete' }, 'aria-label': `Удалить «${task.title}»`, title: 'Удалить' }, [icon('trash')]),
+  ]);
 
-  return el('li', { className: 'item' + (task.done ? ' is-done' : ''), dataset: { id: task.id } }, children);
+  return el('li', { className: 'item' + (task.done ? ' is-done' : '') + (overdue ? ' is-overdue' : ''), dataset: { id: task.id } }, [
+    el('input', { type: 'checkbox', className: 'check item__check', checked: task.done, dataset: { action: 'toggle' }, 'aria-label': `Выполнено: ${task.title}` }),
+    body,
+    actions,
+  ]);
 }
 
-// Сводка на первом экране: числа двузначные, как подписи «зад. 01».
+// Группы зависят от сортировки: по сроку — по датам, по приоритету — по уровням, по дате создания — без групп.
+function groupKey(task) {
+  if (sort === 'priority') return task.priority;
+  if (sort === 'due') {
+    if (!task.dueDate) return 'none';
+    const t = today();
+    if (task.dueDate < t) return 'overdue';
+    if (task.dueDate === t) return 'today';
+    if (task.dueDate === addDays(1)) return 'tomorrow';
+    return 'later';
+  }
+  return 'all';
+}
+const GROUPS = {
+  priority: [['critical', 'Срочно'], ['high', 'Высокий'], ['medium', 'Обычный'], ['low', 'Низкий']],
+  due: [['overdue', 'Просрочено'], ['today', 'Сегодня'], ['tomorrow', 'Завтра'], ['later', 'Позже'], ['none', 'Без срока']],
+  created: [['all', '']],
+};
+
+function renderGroup(title, items, extraClass = '') {
+  const section = el('section', { className: 'group ' + extraClass });
+  if (title) section.append(el('h2', { className: 'group__title' }, [title, el('span', { className: 'count', textContent: ` ${items.length}` })]));
+  section.append(el('ul', { className: 'group__list' }, items.map(renderTask)));
+  return section;
+}
+
+// Строка-сводка под шапкой: дата · сколько дел · процент готовых
 function renderStats() {
   const t = today();
   const active = tasks.filter(x => !x.done);
   const done = tasks.length - active.length;
   const overdue = active.filter(x => x.dueDate && x.dueDate < t).length;
-  const due = active.filter(x => x.dueDate === t).length;
-  const pad = n => String(n).padStart(2, '0');
-  $('stat-active').textContent = pad(active.length);
-  $('stat-overdue').textContent = pad(overdue);
-  $('stat-overdue').closest('.stat').classList.toggle('is-active', overdue > 0);
-  $('stat-today').textContent = pad(due);
-  $('stat-done').textContent = pad(done);
-  const percent = tasks.length ? Math.round(done / tasks.length * 100) : 0;
-  $('progress-bar').style.width = percent + '%';
-  counter.textContent = tasks.length ? `готово ${percent}% · ${done} из ${tasks.length}` : 'задач пока нет';
+  const date = new Date().toLocaleDateString('ru-RU', WEEKDAY_DATE);
+  const parts = [date[0].toUpperCase() + date.slice(1)];
+  if (tasks.length) {
+    parts.push(`${active.length} ${plural(active.length, 'дело', 'дела', 'дел')}`);
+    if (overdue) parts.push(`${overdue} ${plural(overdue, 'просрочено', 'просрочено', 'просрочено')}`);
+    parts.push(`готово ${Math.round(done / tasks.length * 100)}%`);
+  }
+  counter.textContent = parts.join(' · ');
+  const counts = { all: tasks.length, active: active.length, done };
+  filters.querySelectorAll('[data-count]').forEach(c => { c.textContent = counts[c.dataset.count] || ''; });
+}
+
+function render() {
+  const visible = tasks
+    .filter(t => filter === 'all' ? true : filter === 'done' ? t.done : !t.done)
+    .sort(compare);
+  const active = visible.filter(t => !t.done);
+  const done = visible.filter(t => t.done);
+
+  // если перерисовка случилась посреди редактирования, курсор возвращается в то же поле
+  const focused = document.activeElement?.closest?.('.is-editing') ? document.activeElement.name : null;
+
+  const sections = [];
+  for (const [key, title] of GROUPS[sort] || GROUPS.created) {
+    const items = active.filter(t => groupKey(t) === key);
+    if (items.length) sections.push(renderGroup(title, items));
+  }
+  if (done.length) {
+    if (filter === 'done') {
+      sections.push(renderGroup('', done));
+    } else {
+      const group = renderGroup('', doneOpen ? done : [], 'group--done');
+      const toggle = el('button', { type: 'button', className: 'group__toggle', 'aria-expanded': String(doneOpen), dataset: { action: 'toggle-done' } },
+        [icon('chevron-down'), `Готово `, el('span', { className: 'count', textContent: String(done.length) })]);
+      group.prepend(toggle);
+      sections.push(group);
+    }
+  }
+  list.replaceChildren(...sections);
+  if (focused) list.querySelector(`.is-editing [name="${focused}"]`)?.focus();
+
+  // «Очистить готовые» — внутри группы «Готово», когда она раскрыта
+  const doneGroup = list.querySelector('.group--done') || (filter === 'done' && done.length ? list.lastElementChild : null);
+  clearDone.hidden = !(doneGroup && (doneOpen || filter === 'done'));
+  if (!clearDone.hidden) doneGroup.append(clearDone);
+
+  renderStats();
+  empty.hidden = visible.length > 0;
+  empty.textContent = tasks.length ? 'В этом фильтре пусто' : 'Добавьте первое дело — оно появится здесь';
+  renderAi();
 }
 
 function aiCandidates() {
@@ -273,43 +357,18 @@ function aiCandidates() {
 }
 
 function renderAi() {
-  aiStatus.dataset.state = !ai.checked ? 'loading' : ai.enabled ? 'on' : 'off';
-  aiStatus.textContent = !ai.checked ? 'AI: проверка…' : ai.enabled ? 'AI: включён' : 'AI: выключен';
-  aiStatus.title = ai.enabled ? `Провайдер: ${ai.provider}${ai.model ? `, модель: ${ai.model}` : ''}` : (ai.reason || '');
-
   const candidates = aiCandidates().length;
   const needsLogin = ai.enabled && ai.requiresAuth && !Cloud.user;
-  aiBtn.disabled = !ai.enabled || needsLogin || aiBusy || candidates === 0;
+  // пока AI недоступен, на экране о нём ничего нет
+  aiBtn.hidden = !ai.enabled;
+  aiBtn.disabled = needsLogin || aiBusy || candidates === 0;
   aiBtn.classList.toggle('is-loading', aiBusy);
-  aiBtn.title = !ai.enabled ? 'Добавьте API-ключ, чтобы включить AI' : needsLogin ? 'Войдите в аккаунт, чтобы использовать AI' : '';
-
-  if (!ai.checked) aiHint.textContent = '';
-  else if (!ai.enabled) aiHint.textContent = ai.offline
-    ? 'Сервер недоступен: запустите приложение через npm run dev'
-    : ai.requiresAuth ? 'AI пока не подключён на сервере' : 'Добавьте API-ключ в .env, чтобы включить AI';
-  else if (needsLogin) aiHint.textContent = 'Войдите в аккаунт, чтобы использовать AI';
-  else if (aiBusy) aiHint.textContent = 'AI анализирует задачи…';
-  else if (!candidates) aiHint.textContent = 'Нет активных задач без ручного приоритета';
-  else aiHint.textContent = `AI оценит ${Math.min(candidates, MAX_AI_TASKS)} ${plural(candidates, 'задачу', 'задачи', 'задач')}`;
-}
-
-function render() {
-  const visible = tasks
-    .filter(t => filter === 'all' ? true : filter === 'done' ? t.done : !t.done)
-    .sort(compare);
-
-  // если перерисовка случилась посреди редактирования, курсор возвращается в то же поле
-  const focused = document.activeElement?.closest?.('.is-editing') ? document.activeElement.name : null;
-  list.replaceChildren(...visible.map(renderTask));
-  if (focused) list.querySelector(`.is-editing [name="${focused}"]`)?.focus();
-
-  const left = tasks.filter(t => !t.done).length;
-  counter.textContent = tasks.length ? `Осталось: ${left} ${plural(left, 'задача', 'задачи', 'задач')}` : '';
-  renderStats();
-  empty.hidden = visible.length > 0;
-  empty.textContent = tasks.length ? 'В этом фильтре пусто' : 'Задач пока нет';
-  clearDone.hidden = !tasks.some(t => t.done);
-  renderAi();
+  aiBtn.title = needsLogin ? 'Войдите в аккаунт, чтобы упорядочить с AI'
+    : candidates ? `AI расставит приоритеты: ${Math.min(candidates, MAX_AI_TASKS)} ${plural(candidates, 'задача', 'задачи', 'задач')}`
+    : 'Нет активных задач без ручного приоритета';
+  // короткая подсказка — только когда она что-то сообщает
+  aiHint.textContent = !ai.enabled ? '' : aiBusy ? 'AI расставляет приоритеты…'
+    : needsLogin && accountReady ? 'Войдите, чтобы упорядочить задачи с AI' : '';
 }
 
 // ---------- уведомления ----------
@@ -327,6 +386,23 @@ function showToast(text, { undo = false, error = false } = {}) {
 function hideToast() {
   toast.hidden = true;
   undoSnapshot = null;
+  undoAction = null;
+}
+
+// Удаление с отменой. При отмене задача возвращается с новым updatedAt и убирается из deleted,
+// иначе при синхронизации удаление окажется «новее» восстановления.
+function removeWithUndo(ids, message) {
+  const removed = tasks.filter(t => ids.includes(t.id));
+  if (!removed.length) return;
+  ids.forEach(id => openReasons.delete(id));
+  commit(tasks.filter(t => !ids.includes(t.id)));
+  showToast(message, { undo: true });
+  undoAction = () => {
+    const now = new Date().toISOString();
+    for (const t of removed) delete deleted[t.id];
+    commit([...tasks.filter(t => !ids.includes(t.id)), ...removed.map(t => ({ ...t, updatedAt: now }))]);
+    showToast(removed.length > 1 ? 'Задачи восстановлены' : 'Задача восстановлена');
+  };
 }
 
 // ---------- AI ----------
@@ -403,10 +479,46 @@ form.addEventListener('submit', e => {
   const description = descInput.value.trim();
   if (description) task.description = description;
   if (dueInput.value) task.dueDate = dueInput.value;
+  // приоритет, выбранный при добавлении, считается ручным: AI его не перезапишет
+  const priority = $('add-priority').value;
+  if (priority !== 'medium') Object.assign(task, { priority, prioritySource: 'manual' });
   commit([...tasks, task]);
   form.reset();
+  syncChips();
   titleInput.focus();
+  showToast('Дело добавлено');
 });
+
+// ---------- форма добавления: раскрывается из строки «Добавить дело» ----------
+
+const composerOpen = $('composer-open');
+function setComposer(open) {
+  form.hidden = !open;
+  composerOpen.hidden = open;
+  composerOpen.setAttribute('aria-expanded', String(open));
+  $('composer').classList.toggle('is-open', open);
+  if (open) titleInput.focus();
+  else { form.reset(); syncChips(); }
+}
+composerOpen.addEventListener('click', () => setComposer(true));
+$('composer-cancel').addEventListener('click', () => { setComposer(false); composerOpen.focus(); });
+form.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { e.preventDefault(); setComposer(false); composerOpen.focus(); }
+  else if (e.key === 'Enter' && e.target === descInput && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
+});
+
+// быстрые сроки: «Сегодня», «Завтра», «Через неделю»
+function syncChips() {
+  form.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(dueInput.value === addDays(Number(c.dataset.due)))));
+}
+form.querySelector('.chips').addEventListener('click', e => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  const value = addDays(Number(chip.dataset.due));
+  dueInput.value = dueInput.value === value ? '' : value;
+  syncChips();
+});
+dueInput.addEventListener('input', syncChips);
 
 list.addEventListener('change', e => {
   const id = e.target.closest('.item')?.dataset.id;
@@ -417,11 +529,17 @@ list.addEventListener('change', e => {
 
 list.addEventListener('click', e => {
   const action = e.target.closest('[data-action]')?.dataset.action;
+  if (action === 'toggle-done') {
+    doneOpen = !doneOpen;
+    render();
+    list.querySelector('[data-action="toggle-done"]')?.focus();
+    return;
+  }
   const id = e.target.closest('.item')?.dataset.id;
   if (!id) return;
   if (action === 'delete') {
-    openReasons.delete(id);
-    commit(tasks.filter(t => t.id !== id));
+    if (editing?.id === id) editing = null;
+    removeWithUndo([id], 'Задача удалена');
   }
   if (action === 'unlock') patch(id, { prioritySource: 'default' });
   if (action === 'edit') startEditing(id);
@@ -446,7 +564,7 @@ function stopEditing() {
   const id = editing?.id;
   editing = null;
   render();
-  list.querySelector(`.item[data-id="${id}"] .badge--edit`)?.focus();
+  list.querySelector(`.item[data-id="${id}"] [data-action="edit"]`)?.focus();
 }
 
 function saveEditing() {
@@ -507,11 +625,20 @@ sortSelect.addEventListener('change', () => {
   render();
 });
 
-clearDone.addEventListener('click', () => commit(tasks.filter(t => !t.done)));
+clearDone.addEventListener('click', () => {
+  const ids = tasks.filter(t => t.done).map(t => t.id);
+  removeWithUndo(ids, `Удалено ${ids.length} ${plural(ids.length, 'готовое дело', 'готовых дела', 'готовых дел')}`);
+});
 
 aiBtn.addEventListener('click', prioritize);
 
 toastUndo.addEventListener('click', () => {
+  if (undoAction) {
+    const action = undoAction;
+    hideToast();
+    action();
+    return;
+  }
   // Возвращаем только поля приоритета: задачи, добавленные или изменённые после AI, сохраняются.
   if (undoSnapshot) {
     commit(tasks.map(t => {
@@ -540,6 +667,7 @@ const SYNC_TEXT = {
   error: 'Не удалось сохранить, повторим через 30 секунд',
 };
 let authMode = 'login';
+let accountReady = false; // пока аккаунт загружается, не просим войти
 
 function renderAccount() {
   accountBtn.hidden = !Cloud.available;
@@ -719,25 +847,12 @@ setupMenu(viewBtn, viewMenu, item => {
 systemDark.addEventListener('change', () => { if (themeMode === 'auto') applyTheme(); });
 applyTheme();
 
-// ---------- часы и координаты курсора, как в референсе ----------
-
-const clock = $('clock');
-const coords = $('coords');
-
-function tickClock() {
-  const now = new Date();
-  const date = now.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
-  clock.textContent = `${date}_${now.toLocaleTimeString('ru-RU')}`;
-  $('hero-date').textContent = now.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-tickClock();
-setInterval(tickClock, 1000);
-
-window.addEventListener('pointermove', e => {
-  const pad = n => String(Math.round(n)).padStart(4, '0');
-  coords.textContent = `${pad(e.clientX)} X ${pad(e.clientY)} Y`;
-}, { passive: true });
+// линия под шапкой появляется, когда страница прокручена
+const topbar = document.querySelector('.topbar');
+const onScroll = () => topbar.classList.toggle('is-scrolled', window.scrollY > 4);
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
 
 render();
 checkAi();
-Cloud.init();
+Cloud.init().finally(() => { accountReady = true; renderAi(); });

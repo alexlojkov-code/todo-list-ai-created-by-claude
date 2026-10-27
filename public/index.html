@@ -23,101 +23,104 @@
 </head>
 <body>
   <header class="topbar">
-    <button type="button" class="tb-btn tb-btn--dark" id="account-btn" hidden>
-      <span id="account-label">Войти</span>
-      <span class="sync" id="sync" data-state="off"></span>
-      <svg class="icon" aria-hidden="true"><use href="icons.svg#user"/></svg>
-    </button>
-    <p class="topbar__clock" id="clock" aria-hidden="true"></p>
-    <div class="topbar__right">
-      <span class="tb-btn tb-btn--line ai-status" id="ai-status" data-state="loading">AI: проверка…</span>
-      <div class="menu-wrap">
-        <button type="button" class="icon-btn" id="view-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu" aria-label="Вид" title="Вид: тема">
-          <svg class="icon" aria-hidden="true"><use id="view-icon" href="icons.svg#sun"/></svg>
-        </button>
-        <div class="menu" id="view-menu" role="menu" aria-label="Вид" hidden>
-          <p class="menu__label" role="presentation">Тема</p>
-          <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-theme-mode="light" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#sun"/></svg>Светлая</button>
-          <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-theme-mode="dark" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#moon"/></svg>Тёмная</button>
-          <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-theme-mode="auto" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#contrast"/></svg>Как в системе</button>
+    <div class="topbar__inner">
+      <h1 class="topbar__title">Список дел</h1>
+      <div class="topbar__actions">
+        <div class="menu-wrap">
+          <button type="button" class="icon-btn" id="view-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu" aria-label="Вид" title="Вид: тема">
+            <svg class="icon" aria-hidden="true"><use id="view-icon" href="icons.svg#sun"/></svg>
+          </button>
+          <div class="menu" id="view-menu" role="menu" aria-label="Вид" hidden>
+            <p class="menu__label" role="presentation">Тема</p>
+            <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-theme-mode="light" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#sun"/></svg>Светлая</button>
+            <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-theme-mode="dark" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#moon"/></svg>Тёмная</button>
+            <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-theme-mode="auto" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#contrast"/></svg>Как в системе</button>
+          </div>
         </div>
+        <button type="button" class="icon-btn account-btn" id="account-btn" hidden>
+          <svg class="icon" aria-hidden="true"><use href="icons.svg#user"/></svg>
+          <span class="sr-only" id="account-label">Войти</span>
+          <span class="sync" id="sync" data-state="off" aria-hidden="true"></span>
+        </button>
       </div>
     </div>
   </header>
 
   <main class="app">
-    <section class="hero">
-      <div class="hero__main">
-        <p class="label">дела_<span id="hero-date"></span></p>
-        <h1 class="hero__title">
-          <span class="hero__line">Список</span>
-          <span class="hero__line hero__line--shift"><span class="hero__bar" aria-hidden="true"></span>дел</span>
-        </h1>
-        <p class="hero__lead">Задачи, которым <span class="mark">AI</span> расставит приоритет — по&nbsp;срокам и&nbsp;важности.</p>
-      </div>
+    <div class="summary">
+      <p class="summary__text" id="counter" aria-live="polite"></p>
+    </div>
 
-      <aside class="hero__stats" aria-label="Сводка по задачам">
-        <p class="label">сводка</p>
-        <dl class="stats">
-          <div class="stat"><dt>активные</dt><dd id="stat-active">00</dd></div>
-          <div class="stat stat--alert"><dt>просрочено</dt><dd id="stat-overdue">00</dd></div>
-          <div class="stat"><dt>на сегодня</dt><dd id="stat-today">00</dd></div>
-          <div class="stat"><dt>выполнено</dt><dd id="stat-done">00</dd></div>
-        </dl>
-        <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
-        <p class="hero__counter" id="counter"></p>
-      </aside>
-    </section>
-
-    <form class="add" id="add-form" autocomplete="off">
-      <p class="label">нов. задача</p>
-      <div class="add__row">
-        <input class="add__title" id="add-title" type="text" placeholder="Что нужно сделать?" maxlength="200" required>
-        <button class="btn btn--primary btn--lg" type="submit"><svg class="icon" aria-hidden="true"><use href="icons.svg#plus"/></svg>Добавить</button>
-      </div>
-      <div class="add__row add__row--extra">
-        <input class="add__desc" id="add-desc" type="text" placeholder="Описание — необязательно" maxlength="2000">
-        <label class="add__due">
-          <span>срок</span>
-          <input id="add-due" type="date">
+    <div class="controls">
+      <nav class="filters segmented" id="filters" aria-label="Фильтр задач">
+        <button type="button" data-filter="all" class="is-active">Все <span class="count" data-count="all"></span></button>
+        <button type="button" data-filter="active">Активные <span class="count" data-count="active"></span></button>
+        <button type="button" data-filter="done">Готово <span class="count" data-count="done"></span></button>
+      </nav>
+      <div class="controls__right">
+        <button type="button" class="btn btn--quiet" id="ai-btn" hidden>
+          <span class="spinner" aria-hidden="true"></span>
+          <svg class="icon" aria-hidden="true"><use href="icons.svg#sparkle"/></svg>
+          <span class="btn__label">Упорядочить</span>
+        </button>
+        <label class="sort">
+          <span class="sr-only">Сортировка</span>
+          <select id="sort" class="select select--sm" aria-label="Сортировка">
+            <option value="priority">По приоритету</option>
+            <option value="due">По сроку</option>
+            <option value="created">По дате создания</option>
+          </select>
         </label>
       </div>
-    </form>
-
-    <div class="toolbar">
-      <nav class="filters segmented" id="filters" aria-label="Фильтр задач">
-        <button type="button" data-filter="all" class="is-active">Все</button>
-        <button type="button" data-filter="active">Активные</button>
-        <button type="button" data-filter="done">Выполненные</button>
-      </nav>
-      <label class="sort">
-        <span>сорт.</span>
-        <select id="sort" class="select select--sm">
-          <option value="priority">по приоритету</option>
-          <option value="due">по сроку</option>
-          <option value="created">по дате создания</option>
-        </select>
-      </label>
     </div>
+    <p class="ai-hint" id="ai-hint" aria-live="polite"></p>
 
-    <div class="ai-bar">
-      <button type="button" class="btn btn--secondary btn--wide btn--lg" id="ai-btn" disabled>
-        <span class="spinner" aria-hidden="true"></span>
-        <span class="btn__label">Расставить приоритеты с AI</span>
-        <svg class="icon" aria-hidden="true"><use href="icons.svg#sparkle"/></svg>
+    <section class="composer" id="composer">
+      <button type="button" class="composer__open" id="composer-open" aria-expanded="false" aria-controls="add-form">
+        <svg class="icon" aria-hidden="true"><use href="icons.svg#plus"/></svg><span>Добавить дело</span>
       </button>
-      <p class="ai-hint" id="ai-hint"></p>
-    </div>
+      <form class="composer__form" id="add-form" autocomplete="off" hidden>
+        <label class="field">
+          <span class="field__label">Что нужно сделать</span>
+          <input class="input input--title" id="add-title" type="text" placeholder="Например, оплатить счёт за интернет" maxlength="200" required enterkeyhint="done">
+        </label>
+        <label class="field">
+          <span class="field__label">Описание</span>
+          <textarea class="textarea" id="add-desc" rows="2" maxlength="2000" placeholder="Необязательно"></textarea>
+        </label>
+        <div class="composer__row">
+          <div class="field">
+            <span class="field__label" id="add-due-label">Срок</span>
+            <div class="due-picker">
+              <input class="input input--date" id="add-due" type="date" aria-labelledby="add-due-label">
+              <div class="chips" role="group" aria-label="Быстрый срок">
+                <button type="button" class="chip" data-due="0">Сегодня</button>
+                <button type="button" class="chip" data-due="1">Завтра</button>
+                <button type="button" class="chip" data-due="7">Через неделю</button>
+              </div>
+            </div>
+          </div>
+          <label class="field field--priority">
+            <span class="field__label">Приоритет</span>
+            <select class="select" id="add-priority">
+              <option value="low">Низкий</option>
+              <option value="medium" selected>Обычный</option>
+              <option value="high">Высокий</option>
+              <option value="critical">Срочно</option>
+            </select>
+          </label>
+        </div>
+        <div class="composer__actions">
+          <button type="button" class="btn btn--secondary" id="composer-cancel">Отмена</button>
+          <button type="submit" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="icons.svg#plus"/></svg>Добавить</button>
+        </div>
+      </form>
+    </section>
 
-    <ul class="list" id="list"></ul>
-    <p class="empty" id="empty">Задач пока нет</p>
-
-    <footer class="app__footer">
-      <button type="button" class="link" id="clear-done">Удалить выполненные</button>
-    </footer>
+    <div class="list" id="list"></div>
+    <p class="empty" id="empty" hidden></p>
+    <button type="button" class="btn btn--quiet" id="clear-done" hidden><svg class="icon" aria-hidden="true"><use href="icons.svg#trash"/></svg>Очистить готовые</button>
   </main>
-
-  <p class="coords" id="coords" aria-hidden="true">0000 X 0000 Y</p>
 
   <div class="toast" id="toast" role="status" hidden>
     <svg class="icon toast__icon" aria-hidden="true"><use id="toast-icon" href="icons.svg#check"/></svg>
