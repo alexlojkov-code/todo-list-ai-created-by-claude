@@ -2,188 +2,242 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#F1F2EE" id="theme-color">
   <title>Список дел</title>
   <meta name="description" content="Список дел с AI-приоритезацией задач">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Oswald:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Tenor+Sans&display=swap">
   <script>
-    // Тема до первой отрисовки, чтобы не было вспышки светлого экрана
+    // Тема до первой отрисовки, чтобы не было вспышки. Новым посетителям — светлая,
+    // сохранённый выбор (в том числе «как в системе») не меняется.
     (function () {
-      var mode = 'auto';
-      try { mode = localStorage.getItem('todo-list-ai.theme') || 'auto'; } catch (e) {}
+      var mode = 'light';
+      try { mode = localStorage.getItem('todo-list-ai.theme') || 'light'; } catch (e) {}
       var dark = mode === 'dark' || (mode === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
       document.documentElement.dataset.themeMode = mode;
+      // анимации: выбор пользователя, но системная настройка «Уменьшить движение» важнее
+      var motion = 'on';
+      try { motion = localStorage.getItem('todo-list-ai.motion') === 'off' ? 'off' : 'on'; } catch (e) {}
+      document.documentElement.dataset.motionChoice = motion;
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) motion = 'off';
+      document.documentElement.dataset.motion = motion;
     })();
   </script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="topbar">
-    <button type="button" class="tb-btn tb-btn--dark" id="account-btn" hidden>
-      <span id="account-label">Войти</span>
-      <span class="sync" id="sync" data-state="off"></span>
-      <span class="star" aria-hidden="true">✱</span>
-    </button>
-    <p class="topbar__clock" id="clock" aria-hidden="true"></p>
-    <div class="topbar__right">
-      <span class="tb-btn tb-btn--line ai-status" id="ai-status" data-state="loading">AI: проверка…</span>
-      <button type="button" class="tb-btn tb-btn--line theme-btn" id="theme-btn">
-        <span class="theme-btn__icon" aria-hidden="true">◐</span>
-        <span class="theme-btn__label">авто</span>
-      </button>
+    <div class="topbar__inner">
+      <h1 class="topbar__title">Список дел</h1>
+      <div class="topbar__actions">
+        <div class="menu-wrap">
+          <button type="button" class="icon-btn" id="view-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu" aria-label="Вид" title="Вид: тема">
+            <svg class="icon" aria-hidden="true"><use id="view-icon" href="icons.svg#sun"/></svg>
+          </button>
+          <div class="menu" id="view-menu" role="menu" aria-label="Вид" hidden>
+            <p class="menu__label" role="presentation">Тема</p>
+            <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-theme-mode="light" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#sun"/></svg>Светлая</button>
+            <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-theme-mode="dark" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#moon"/></svg>Тёмная</button>
+            <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-theme-mode="auto" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#contrast"/></svg>Как в системе</button>
+            <div class="menu__sep" role="separator"></div>
+            <p class="menu__label" role="presentation">Анимации</p>
+            <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-motion="on" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#sparkle"/></svg>Включены</button>
+            <button type="button" class="menu__item" role="menuitemradio" tabindex="-1" data-motion="off" aria-checked="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#close"/></svg>Выключены</button>
+            <p class="menu__note" id="motion-note" hidden>В системе включено «Уменьшить движение» — крупных перемещений не будет.</p>
+          </div>
+        </div>
+        <button type="button" class="icon-btn account-btn" id="account-btn" hidden>
+          <svg class="icon" aria-hidden="true"><use href="icons.svg#user"/></svg>
+          <span class="sr-only" id="account-label">Войти</span>
+          <span class="sync" id="sync" data-state="off" aria-hidden="true"></span>
+        </button>
+      </div>
     </div>
   </header>
 
   <main class="app">
-    <section class="hero">
-      <div class="hero__main">
-        <p class="label">дела_<span id="hero-date"></span></p>
-        <h1 class="hero__title">
-          <span class="hero__line">Список</span>
-          <span class="hero__line hero__line--shift"><span class="hero__bar" aria-hidden="true"></span>дел</span>
-        </h1>
-        <p class="hero__lead">Задачи, которым <span class="mark">AI</span> расставит приоритет — по&nbsp;срокам и&nbsp;важности.</p>
+    <div class="summary">
+      <p class="summary__text" id="counter" aria-live="polite"></p>
+      <div class="segmented view-switch" id="view-switch" role="group" aria-label="Режим">
+        <button type="button" data-view="list" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="icons.svg#menu"/></svg><span>Весь список</span></button>
+        <button type="button" data-view="focus" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#arrow-right"/></svg><span>Фокус</span></button>
       </div>
+    </div>
 
-      <aside class="hero__stats" aria-label="Сводка по задачам">
-        <p class="label">сводка</p>
-        <dl class="stats">
-          <div class="stat"><dt>активные</dt><dd id="stat-active">00</dd></div>
-          <div class="stat stat--alert"><dt>просрочено</dt><dd id="stat-overdue">00</dd></div>
-          <div class="stat"><dt>на сегодня</dt><dd id="stat-today">00</dd></div>
-          <div class="stat"><dt>выполнено</dt><dd id="stat-done">00</dd></div>
-        </dl>
-        <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
-        <p class="hero__counter" id="counter"></p>
-      </aside>
-    </section>
-
-    <form class="add" id="add-form" autocomplete="off">
-      <p class="label">нов. задача</p>
-      <div class="add__row">
-        <input class="add__title" id="add-title" type="text" placeholder="Что нужно сделать?" maxlength="200" required>
-        <button class="btn btn--dark" type="submit">Добавить <span class="star" aria-hidden="true">✱</span></button>
-      </div>
-      <div class="add__row add__row--extra">
-        <input class="add__desc" id="add-desc" type="text" placeholder="Описание — необязательно" maxlength="2000">
-        <label class="add__due">
-          <span>срок</span>
-          <input id="add-due" type="date">
+    <div class="controls">
+      <nav class="filters segmented" id="filters" aria-label="Фильтр задач">
+        <button type="button" data-filter="all" class="is-active">Все <span class="count" data-count="all"></span></button>
+        <button type="button" data-filter="active">Активные <span class="count" data-count="active"></span></button>
+        <button type="button" data-filter="done">Готово <span class="count" data-count="done"></span></button>
+      </nav>
+      <div class="controls__right">
+        <button type="button" class="btn btn--quiet" id="ai-btn" hidden>
+          <span class="spinner" aria-hidden="true"></span>
+          <svg class="icon" aria-hidden="true"><use href="icons.svg#sparkle"/></svg>
+          <span class="btn__label">Упорядочить</span>
+        </button>
+        <label class="sort">
+          <span class="sr-only">Сортировка</span>
+          <select id="sort" class="select select--sm" aria-label="Сортировка">
+            <option value="priority">По приоритету</option>
+            <option value="due">По сроку</option>
+            <option value="created">По дате создания</option>
+          </select>
         </label>
       </div>
-    </form>
-
-    <div class="toolbar">
-      <nav class="filters" id="filters">
-        <button type="button" data-filter="all" class="is-active">Все</button>
-        <button type="button" data-filter="active">Активные</button>
-        <button type="button" data-filter="done">Выполненные</button>
-      </nav>
-      <label class="sort">
-        <span>сорт.</span>
-        <select id="sort">
-          <option value="priority">по приоритету</option>
-          <option value="due">по сроку</option>
-          <option value="created">по дате создания</option>
-        </select>
-      </label>
     </div>
+    <p class="ai-hint" id="ai-hint" aria-live="polite"></p>
 
-    <div class="ai-bar">
-      <button type="button" class="btn btn--ai" id="ai-btn" disabled>
-        <span class="spinner" aria-hidden="true"></span>
-        <span class="btn__label">Расставить приоритеты с AI</span>
-        <span class="star" aria-hidden="true">✱</span>
+    <section class="composer" id="composer">
+      <button type="button" class="composer__open" id="composer-open" aria-expanded="false" aria-controls="add-form">
+        <svg class="icon" aria-hidden="true"><use href="icons.svg#plus"/></svg><span>Добавить дело</span>
       </button>
-      <p class="ai-hint" id="ai-hint"></p>
-    </div>
+      <form class="composer__form" id="add-form" autocomplete="off" hidden>
+        <label class="field">
+          <span class="field__label">Что нужно сделать</span>
+          <input class="input input--title" id="add-title" type="text" placeholder="Например, оплатить счёт за интернет" maxlength="200" required enterkeyhint="done">
+        </label>
+        <label class="field">
+          <span class="field__label">Описание</span>
+          <textarea class="textarea" id="add-desc" rows="2" maxlength="2000" placeholder="Необязательно"></textarea>
+        </label>
+        <div class="composer__row">
+          <div class="field">
+            <span class="field__label" id="add-due-label">Срок</span>
+            <div class="due-picker">
+              <input class="input input--date" id="add-due" type="date" aria-labelledby="add-due-label">
+              <div class="chips" role="group" aria-label="Быстрый срок">
+                <button type="button" class="chip" data-due="0">Сегодня</button>
+                <button type="button" class="chip" data-due="1">Завтра</button>
+                <button type="button" class="chip" data-due="7">Через неделю</button>
+              </div>
+            </div>
+          </div>
+          <label class="field field--priority">
+            <span class="field__label">Приоритет</span>
+            <select class="select" id="add-priority">
+              <option value="low">Низкий</option>
+              <option value="medium" selected>Обычный</option>
+              <option value="high">Высокий</option>
+              <option value="critical">Срочно</option>
+            </select>
+          </label>
+        </div>
+        <div class="composer__actions">
+          <button type="button" class="btn btn--secondary" id="composer-cancel">Отмена</button>
+          <button type="submit" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="icons.svg#plus"/></svg>Добавить</button>
+        </div>
+      </form>
+    </section>
 
-    <ul class="list" id="list"></ul>
-    <p class="empty" id="empty">Задач пока нет</p>
-
-    <footer class="app__footer">
-      <button type="button" class="link" id="clear-done">Удалить выполненные</button>
-    </footer>
+    <div class="list" id="list"></div>
+    <p class="empty" id="empty" hidden></p>
+    <button type="button" class="btn btn--quiet" id="clear-done" hidden><svg class="icon" aria-hidden="true"><use href="icons.svg#trash"/></svg>Очистить готовые</button>
   </main>
 
-  <p class="coords" id="coords" aria-hidden="true">0000 X 0000 Y</p>
+  <nav class="bottombar" aria-label="Быстрые действия">
+    <button type="button" class="btn btn--primary btn--lg bottombar__add" id="bottom-add"><svg class="icon" aria-hidden="true"><use href="icons.svg#plus"/></svg>Добавить дело</button>
+    <div class="segmented bottombar__views" role="group" aria-label="Режим">
+      <button type="button" data-view="list" aria-pressed="true" aria-label="Весь список" title="Весь список"><svg class="icon" aria-hidden="true"><use href="icons.svg#menu"/></svg></button>
+      <button type="button" data-view="focus" aria-pressed="false" aria-label="Фокус" title="Фокус"><svg class="icon" aria-hidden="true"><use href="icons.svg#arrow-right"/></svg></button>
+    </div>
+  </nav>
+  <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
 
   <div class="toast" id="toast" role="status" hidden>
+    <svg class="icon toast__icon" aria-hidden="true"><use id="toast-icon" href="icons.svg#check"/></svg>
     <span id="toast-text"></span>
+    <span class="toast__timer" id="toast-timer" aria-hidden="true"></span>
     <button type="button" class="link link--light" id="toast-undo" hidden>Отменить</button>
   </div>
 
   <dialog class="dialog" id="account-dialog" aria-labelledby="account-title">
-    <button type="button" class="dialog__close" id="dialog-close" aria-label="Закрыть">×</button>
+    <button type="button" class="icon-btn dialog__close" id="dialog-close" aria-label="Закрыть" title="Закрыть"><svg class="icon" aria-hidden="true"><use href="icons.svg#close"/></svg></button>
 
     <section id="guest-view">
-      <p class="label">акк. 01</p>
-      <h2 id="account-title">Аккаунт</h2>
-      <p class="dialog__lead">Войдите, чтобы задачи сохранялись на сервере и были доступны на всех устройствах.</p>
-      <div class="tabs" role="tablist">
-        <button type="button" role="tab" data-mode="login" class="is-active">Вход</button>
-        <button type="button" role="tab" data-mode="register">Регистрация</button>
+      <h2 class="dialog__title" id="account-title">Вход</h2>
+      <p class="dialog__lead">Задачи будут доступны на всех ваших устройствах.</p>
+      <div class="tabs segmented" role="group" aria-label="Вход или регистрация">
+        <button type="button" data-mode="login" class="is-active" aria-pressed="true">Вход</button>
+        <button type="button" data-mode="register" aria-pressed="false">Регистрация</button>
       </div>
       <form class="auth-form" id="auth-form" novalidate>
         <label class="field" id="name-field" hidden>
-          <span>Имя (необязательно)</span>
-          <input type="text" name="name" maxlength="60" autocomplete="name">
+          <span class="field__label">Имя (необязательно)</span>
+          <input class="input" type="text" name="name" maxlength="60" autocomplete="name">
         </label>
         <label class="field">
-          <span>Email</span>
-          <input type="email" name="email" required maxlength="254" autocomplete="email">
+          <span class="field__label">Email</span>
+          <input class="input" type="email" name="email" required maxlength="254" autocomplete="email" inputmode="email" aria-describedby="email-error">
+          <span class="field__error" id="email-error" data-error-for="email" role="alert"></span>
         </label>
-        <label class="field">
-          <span>Пароль</span>
-          <input type="password" name="password" required minlength="10" maxlength="200" autocomplete="current-password">
+        <div class="field">
+          <label class="field__label" for="auth-password">Пароль</label>
+          <div class="password">
+            <input class="input" id="auth-password" type="password" name="password" required minlength="10" maxlength="200" autocomplete="current-password" aria-describedby="password-hint password-error">
+            <button type="button" class="icon-btn password__toggle" id="password-toggle" aria-label="Показать пароль" title="Показать пароль" aria-pressed="false">
+              <svg class="icon" aria-hidden="true"><use id="password-toggle-icon" href="icons.svg#eye"/></svg>
+            </button>
+          </div>
           <small class="field__hint" id="password-hint" hidden>Не короче 10 символов</small>
-        </label>
+          <span class="field__error" id="password-error" data-error-for="password" role="alert"></span>
+        </div>
         <p class="form-error" id="auth-error" role="alert"></p>
-        <button type="submit" class="btn btn--dark btn--wide" id="auth-submit">Войти</button>
+        <button type="submit" class="btn btn--primary btn--wide btn--lg" id="auth-submit"><span class="spinner" aria-hidden="true"></span><span class="btn__label">Войти</span></button>
       </form>
     </section>
 
     <section id="user-view" hidden>
-      <p class="label">акк. 01</p>
-      <h2>Аккаунт</h2>
-      <p class="dialog__lead"><strong id="user-email"></strong><br><span id="sync-text"></span></p>
+      <h2 class="dialog__title" id="user-name">Аккаунт</h2>
+      <p class="dialog__lead" id="user-email"></p>
 
-      <details class="block">
-        <summary>Сменить пароль</summary>
-        <form class="auth-form" id="password-form" novalidate>
-          <label class="field">
-            <span>Текущий пароль</span>
-            <input type="password" name="current" required autocomplete="current-password">
-          </label>
-          <label class="field">
-            <span>Новый пароль</span>
-            <input type="password" name="next" required minlength="10" maxlength="200" autocomplete="new-password">
-            <small class="field__hint">Не короче 10 символов. Другие устройства выйдут из аккаунта.</small>
-          </label>
-          <p class="form-error" role="alert"></p>
-          <button type="submit" class="btn btn--dark btn--wide">Сменить пароль</button>
-        </form>
-      </details>
+      <div class="sync-card" id="sync-card" data-state="synced">
+        <svg class="icon" aria-hidden="true"><use id="sync-icon" href="icons.svg#check"/></svg>
+        <span id="sync-text"></span>
+      </div>
 
-      <details class="block block--danger">
-        <summary>Удалить аккаунт</summary>
-        <form class="auth-form" id="delete-form" novalidate>
-          <p class="dialog__lead">Аккаунт и все задачи на сервере будут удалены без возможности восстановления.</p>
-          <label class="field">
-            <span>Пароль</span>
-            <input type="password" name="password" required autocomplete="current-password">
-          </label>
-          <p class="form-error" role="alert"></p>
-          <button type="submit" class="btn btn--danger btn--wide">Удалить навсегда</button>
-        </form>
-      </details>
-
-      <button type="button" class="btn btn--ghost btn--wide" id="logout-btn">Выйти</button>
+      <div class="account-menu">
+        <details class="block">
+          <summary class="block__summary"><svg class="icon" aria-hidden="true"><use href="icons.svg#pencil"/></svg>Сменить пароль</summary>
+          <form class="auth-form" id="password-form" novalidate>
+            <label class="field">
+              <span class="field__label">Текущий пароль</span>
+              <input class="input" type="password" name="current" required autocomplete="current-password">
+            </label>
+            <label class="field">
+              <span class="field__label">Новый пароль</span>
+              <input class="input" type="password" name="next" required minlength="10" maxlength="200" autocomplete="new-password">
+              <small class="field__hint">Не короче 10 символов. Другие устройства выйдут из аккаунта.</small>
+            </label>
+            <p class="form-error" role="alert"></p>
+            <button type="submit" class="btn btn--primary btn--wide">Сменить пароль</button>
+          </form>
+        </details>
+        <button type="button" class="block__summary block__button" id="logout-btn"><svg class="icon" aria-hidden="true"><use href="icons.svg#arrow-right"/></svg>Выйти</button>
+      </div>
       <p class="dialog__note">После выхода задачи удаляются с этого устройства и остаются в аккаунте.</p>
+
+      <button type="button" class="btn btn--quiet btn--danger-text dialog__danger" id="delete-open"><svg class="icon" aria-hidden="true"><use href="icons.svg#trash"/></svg>Удалить аккаунт</button>
     </section>
+  </dialog>
+
+  <dialog class="dialog dialog--confirm" id="delete-dialog" aria-labelledby="delete-title">
+    <h2 class="dialog__title" id="delete-title">Удалить аккаунт?</h2>
+    <p class="dialog__lead">Аккаунт и все задачи на сервере будут удалены без возможности восстановления. На этом устройстве задачи тоже пропадут.</p>
+    <form class="auth-form" id="delete-form" novalidate>
+      <label class="field">
+        <span class="field__label">Пароль для подтверждения</span>
+        <input class="input" type="password" name="password" required autocomplete="current-password">
+      </label>
+      <p class="form-error" role="alert"></p>
+      <div class="dialog__actions">
+        <button type="button" class="btn btn--secondary" id="delete-cancel">Отмена</button>
+        <button type="submit" class="btn btn--danger"><svg class="icon" aria-hidden="true"><use href="icons.svg#trash"/></svg>Удалить навсегда</button>
+      </div>
+    </form>
   </dialog>
 
   <script src="cloud.js"></script>
