@@ -26,13 +26,13 @@
     <button type="button" class="tb-btn tb-btn--dark" id="account-btn" hidden>
       <span id="account-label">Войти</span>
       <span class="sync" id="sync" data-state="off"></span>
-      <span class="star" aria-hidden="true">✱</span>
+      <svg class="icon" aria-hidden="true"><use href="icons.svg#user"/></svg>
     </button>
     <p class="topbar__clock" id="clock" aria-hidden="true"></p>
     <div class="topbar__right">
       <span class="tb-btn tb-btn--line ai-status" id="ai-status" data-state="loading">AI: проверка…</span>
       <button type="button" class="tb-btn tb-btn--line theme-btn" id="theme-btn">
-        <span class="theme-btn__icon" aria-hidden="true">◐</span>
+        <svg class="icon theme-btn__icon" aria-hidden="true"><use href="icons.svg#sun"/></svg>
         <span class="theme-btn__label">авто</span>
       </button>
     </div>
@@ -66,7 +66,7 @@
       <p class="label">нов. задача</p>
       <div class="add__row">
         <input class="add__title" id="add-title" type="text" placeholder="Что нужно сделать?" maxlength="200" required>
-        <button class="btn btn--dark" type="submit">Добавить <span class="star" aria-hidden="true">✱</span></button>
+        <button class="btn btn--dark" type="submit"><svg class="icon" aria-hidden="true"><use href="icons.svg#plus"/></svg>Добавить</button>
       </div>
       <div class="add__row add__row--extra">
         <input class="add__desc" id="add-desc" type="text" placeholder="Описание — необязательно" maxlength="2000">
@@ -97,7 +97,7 @@
       <button type="button" class="btn btn--ai" id="ai-btn" disabled>
         <span class="spinner" aria-hidden="true"></span>
         <span class="btn__label">Расставить приоритеты с AI</span>
-        <span class="star" aria-hidden="true">✱</span>
+        <svg class="icon" aria-hidden="true"><use href="icons.svg#sparkle"/></svg>
       </button>
       <p class="ai-hint" id="ai-hint"></p>
     </div>
@@ -113,12 +113,13 @@
   <p class="coords" id="coords" aria-hidden="true">0000 X 0000 Y</p>
 
   <div class="toast" id="toast" role="status" hidden>
+    <svg class="icon toast__icon" aria-hidden="true"><use id="toast-icon" href="icons.svg#check"/></svg>
     <span id="toast-text"></span>
     <button type="button" class="link link--light" id="toast-undo" hidden>Отменить</button>
   </div>
 
   <dialog class="dialog" id="account-dialog" aria-labelledby="account-title">
-    <button type="button" class="dialog__close" id="dialog-close" aria-label="Закрыть">×</button>
+    <button type="button" class="dialog__close" id="dialog-close" aria-label="Закрыть" title="Закрыть"><svg class="icon" aria-hidden="true"><use href="icons.svg#close"/></svg></button>
 
     <section id="guest-view">
       <p class="label">акк. 01</p>

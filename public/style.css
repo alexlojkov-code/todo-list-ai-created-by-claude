@@ -133,6 +133,10 @@
 
 * { box-sizing: border-box; }
 
+/* Иконки из спрайта icons.svg: 20×20, цвет от текста */
+.icon { width: 20px; height: 20px; flex-shrink: 0; vertical-align: middle; }
+.btn .icon, .badge .icon { width: 18px; height: 18px; }
+
 html { font-synthesis: none; -webkit-text-size-adjust: 100%; }
 
 body {
@@ -204,7 +208,7 @@ button { cursor: pointer; }
 .theme-btn:hover { background: var(--ink); color: var(--on-ink); }
 .theme-btn__icon { font-size: 16px; line-height: 1; }
 
-.ai-status::after { content: "✱"; color: var(--muted); font-size: 1.1em; }
+
 .ai-status[data-state="on"]::after { color: var(--red); }
 
 .sync { width: 7px; height: 7px; flex-shrink: 0; }
@@ -260,7 +264,8 @@ button { cursor: pointer; }
 .stat dt { font-size: var(--fs-caption); color: var(--muted); letter-spacing: 0; }
 .stat dd {
   margin: 4px 0 0;
-  font: 500 clamp(30px, 3.4vw, 40px)/1 var(--font-display);
+  /* цифры — только Onest: у Tenor Sans нет табличных цифр */
+  font: 500 clamp(28px, 3.2vw, 36px)/1 var(--font-text);
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
@@ -404,7 +409,7 @@ select:focus-visible, input:focus-visible, button:focus-visible { outline: 2px s
   display: grid;
   place-content: center;
 }
-.item__check::after { content: "✱"; color: var(--on-ink); font-size: 14px; line-height: 1; transform: scale(0); transition: transform .12s; }
+.item__check::after { content: ""; width: 14px; height: 14px; background: currentColor; -webkit-mask: url("icons-check.svg") center / contain no-repeat; mask: url("icons-check.svg") center / contain no-repeat; color: var(--on-ink); transform: scale(0); transition: transform var(--dur-fast) var(--ease); }
 .item__check:checked { background: var(--red); border-color: var(--red); }
 .item__check:checked::after { color: #fff; transform: scale(1); }
 
@@ -547,7 +552,7 @@ select:focus-visible, input:focus-visible, button:focus-visible { outline: 2px s
   color: var(--on-ink);
   font-size: 13px;
 }
-.toast::before { content: "✱"; color: var(--red-soft); }
+
 .toast[hidden] { display: none; }
 .toast.is-error { background: var(--red); color: #fff; }
 .toast.is-error::before { color: #fff; }
@@ -628,8 +633,8 @@ select:focus-visible, input:focus-visible, button:focus-visible { outline: 2px s
   cursor: pointer;
 }
 .block summary::-webkit-details-marker { display: none; }
-.block summary::before { content: "+ "; color: var(--red); }
-.block[open] summary::before { content: "– "; }
+.block summary::after { content: ""; float: right; width: 20px; height: 20px; background: currentColor; -webkit-mask: url("icons-chevron.svg") center / contain no-repeat; mask: url("icons-chevron.svg") center / contain no-repeat; transition: transform var(--dur-fast) var(--ease); }
+.block[open] summary::after { transform: rotate(180deg); }
 .block[open] summary { margin-bottom: 14px; }
 .block--danger summary { color: var(--red); }
 

@@ -129,6 +129,18 @@ function formatDue(date) {
   return new Date(y, m - 1, d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 }
 
+// Иконка из спрайта icons.svg
+function icon(name, className = 'icon') {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', className);
+  svg.setAttribute('aria-hidden', 'true');
+  const use = document.createElementNS(NS, 'use');
+  use.setAttribute('href', `icons.svg#${name}`);
+  svg.append(use);
+  return svg;
+}
+
 function el(tag, props = {}, children = []) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(props)) {
@@ -177,7 +189,7 @@ function renderEditor(task, index) {
       ]),
       el('div', { className: 'item__form-actions' }, [
         el('button', { type: 'button', className: 'btn btn--line', textContent: 'Отмена', dataset: { action: 'edit-cancel' } }),
-        el('button', { type: 'submit', className: 'btn btn--dark' }, ['Сохранить ', el('span', { className: 'star', textContent: '✱', 'aria-hidden': 'true' })]),
+        el('button', { type: 'submit', className: 'btn btn--dark' }, [icon('check'), 'Сохранить']),
       ]),
     ]),
     el('p', { className: 'item__form-hint', textContent: 'Enter — сохранить · Esc — отменить' }),
@@ -198,9 +210,9 @@ function renderTask(task, index) {
   const meta = [prio];
   if (task.prioritySource === 'manual') {
     meta.push(el('button', {
-      type: 'button', className: 'badge badge--lock', textContent: '✱ закреплено',
+      type: 'button', className: 'badge badge--lock',
       title: 'Закреплено вручную, AI не изменит. Нажмите, чтобы снять закрепление', dataset: { action: 'unlock' },
-    }));
+    }, [icon('pin'), 'закреплено']));
   } else if (task.prioritySource === 'ai') {
     meta.push(el('button', {
       type: 'button', className: 'badge badge--ai', textContent: openReasons.has(task.id) ? 'скрыть обоснование' : 'почему так — AI',
@@ -209,9 +221,9 @@ function renderTask(task, index) {
     }));
   }
   meta.push(el('button', {
-    type: 'button', className: 'badge badge--edit', textContent: '✎ изменить',
+    type: 'button', className: 'badge badge--edit',
     title: 'Изменить название, описание и срок', dataset: { action: 'edit' },
-  }));
+  }, [icon('pencil'), 'изменить']));
   if (task.dueDate) {
     meta.push(el('span', {
       className: 'item__due' + (overdue ? ' is-overdue' : ''),
@@ -229,7 +241,7 @@ function renderTask(task, index) {
     el('span', { className: 'item__num', textContent: `зад. ${String(index + 1).padStart(2, '0')}`, 'aria-hidden': 'true' }),
     el('input', { type: 'checkbox', className: 'item__check', checked: task.done, dataset: { action: 'toggle' }, 'aria-label': 'Выполнено' }),
     body,
-    el('button', { type: 'button', className: 'item__del', textContent: '×', dataset: { action: 'delete' }, 'aria-label': 'Удалить' }),
+    el('button', { type: 'button', className: 'item__del', dataset: { action: 'delete' }, 'aria-label': 'Удалить', title: 'Удалить' }, [icon('trash')]),
   ];
   if (task.prioritySource === 'ai' && task.aiReason) {
     children.push(el('p', { className: 'item__reason', textContent: task.aiReason, hidden: !openReasons.has(task.id) }));
@@ -305,6 +317,7 @@ function render() {
 function showToast(text, { undo = false, error = false } = {}) {
   clearTimeout(toastTimer);
   toastText.textContent = text;
+  $('toast-icon').setAttribute('href', `icons.svg#${error ? 'alert' : undo ? 'undo' : 'check'}`);
   toastUndo.hidden = !undo;
   toast.classList.toggle('is-error', error);
   toast.hidden = false;
@@ -637,9 +650,9 @@ window.addEventListener('beforeunload', () => { Cloud.flush(); });
 
 const THEME_KEY = 'todo-list-ai.theme';
 const THEMES = {
-  auto: { icon: '◐', label: 'авто', title: 'Тема как в системе' },
-  light: { icon: '☀', label: 'светлая', title: 'Светлая тема' },
-  dark: { icon: '☾', label: 'тёмная', title: 'Тёмная тема' },
+  auto: { icon: 'contrast', label: 'как в системе', title: 'Тема как в системе' },
+  light: { icon: 'sun', label: 'светлая', title: 'Светлая тема' },
+  dark: { icon: 'moon', label: 'тёмная', title: 'Тёмная тема' },
 };
 const NEXT_THEME = { auto: 'light', light: 'dark', dark: 'auto' };
 const themeBtn = $('theme-btn');
@@ -651,7 +664,7 @@ function applyTheme() {
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   document.documentElement.dataset.themeMode = themeMode;
   const t = THEMES[themeMode];
-  themeBtn.querySelector('.theme-btn__icon').textContent = t.icon;
+  themeBtn.querySelector('.theme-btn__icon use').setAttribute('href', `icons.svg#${t.icon}`);
   themeBtn.querySelector('.theme-btn__label').textContent = t.label;
   themeBtn.title = `${t.title}. Нажмите, чтобы сменить`;
   themeBtn.setAttribute('aria-label', `Тема: ${t.label}. Сменить`);
