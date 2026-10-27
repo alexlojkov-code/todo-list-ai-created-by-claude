@@ -38,6 +38,8 @@ let doneOpen = false; // раскрыта ли группа «Готово»
 const VIEW_KEY = 'todo-list-ai.view';
 let view = (() => { try { return localStorage.getItem(VIEW_KEY) === 'focus' ? 'focus' : 'list'; } catch { return 'list'; } })();
 let doneTodayOpen = false;
+let expandedId = null; // на телефоне: строка, у которой раскрыты действия
+const touchLayout = matchMedia('(hover: none), (max-width: 640px)');
 let undoAction = null; // отмена последнего удаления (уведомление «Отменить»)
 
 // ---------- хранение ----------
@@ -266,10 +268,20 @@ function renderTask(task) {
     el('button', { type: 'button', className: 'icon-btn icon-btn--danger', dataset: { action: 'delete' }, 'aria-label': `Удалить «${task.title}»`, title: 'Удалить' }, [icon('trash')]),
   ]);
 
-  return el('li', { className: 'item' + (task.done ? ' is-done' : '') + (overdue ? ' is-overdue' : ''), dataset: { id: task.id } }, [
+  // на телефоне действия открываются нажатием на строку — подписанными кнопками под задачей
+  const more = expandedId === task.id ? [el('div', { className: 'item__more' }, [
+    el('button', { type: 'button', className: 'btn btn--quiet', dataset: { action: 'edit' } }, [icon('pencil'), 'Изменить']),
+    ...(task.done ? [] : [
+      el('button', { type: 'button', className: 'btn btn--quiet', dataset: { action: 'pin' } }, [icon('pin'), 'Сейчас']),
+      el('button', { type: 'button', className: 'btn btn--quiet', dataset: { action: 'defer' } }, [icon('later'), 'Отложить']),
+    ]),
+    el('button', { type: 'button', className: 'btn btn--quiet btn--danger-text', dataset: { action: 'delete' } }, [icon('trash'), 'Удалить']),
+  ])] : [];
+  return el('li', { className: 'item' + (task.done ? ' is-done' : '') + (overdue ? ' is-overdue' : '') + (expandedId === task.id ? ' is-expanded' : ''), dataset: { id: task.id } }, [
     el('input', { type: 'checkbox', className: 'check item__check', checked: task.done, dataset: { action: 'toggle' }, 'aria-label': `Выполнено: ${task.title}` }),
     body,
     actions,
+    ...more,
   ]);
 }
 
@@ -312,7 +324,9 @@ function renderStats() {
     if (overdue) parts.push(`${overdue} ${plural(overdue, 'просрочено', 'просрочено', 'просрочено')}`);
     parts.push(`готово ${Math.round(done / tasks.length * 100)}%`);
   }
-  counter.textContent = parts.join(' · ');
+  // дата и цифры — двумя частями: на десктопе в строку, на телефоне в две строки
+  counter.replaceChildren(el('span', { className: 'summary__date', textContent: parts[0] }),
+    ...(parts.length > 1 ? [el('span', { className: 'summary__nums', textContent: parts.slice(1).join(' · ') })] : []));
   const counts = { all: tasks.length, active: active.length, done };
   filters.querySelectorAll('[data-count]').forEach(c => { c.textContent = counts[c.dataset.count] || ''; });
 }
@@ -485,7 +499,7 @@ function renderFocus() {
 
 function renderView() {
   document.body.dataset.view = view;
-  $('view-switch').querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
+  document.querySelectorAll('#view-switch [data-view], .bottombar__views [data-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
 }
 
 function render() {
@@ -685,14 +699,34 @@ form.addEventListener('submit', e => {
 // ---------- форма добавления: раскрывается из строки «Добавить дело» ----------
 
 const composerOpen = $('composer-open');
+const backdrop = $('sheet-backdrop');
+let sheetInHistory = false;
 function setComposer(open) {
   form.hidden = !open;
   composerOpen.hidden = open;
   composerOpen.setAttribute('aria-expanded', String(open));
   $('composer').classList.toggle('is-open', open);
+  // на телефоне форма — лист снизу: фон затемнён и не прокручивается, «Назад» закрывает
+  const sheet = open && touchLayout.matches;
+  document.body.classList.toggle('sheet-open', sheet);
+  backdrop.hidden = !sheet;
+  if (sheet && !sheetInHistory) { history.pushState({ sheet: 'composer' }, ''); sheetInHistory = true; }
+  if (!open && sheetInHistory) { sheetInHistory = false; if (history.state?.sheet) history.back(); }
   if (open) titleInput.focus();
   else { form.reset(); syncChips(); }
 }
+window.addEventListener('popstate', () => {
+  if (!sheetInHistory) return;
+  sheetInHistory = false;
+  setComposer(false);
+});
+backdrop.addEventListener('click', () => setComposer(false));
+$('bottom-add').addEventListener('click', () => setComposer(true));
+// поле в фокусе на телефоне не прячется под клавиатурой
+form.addEventListener('focusin', e => {
+  if (!touchLayout.matches) return;
+  setTimeout(() => e.target.scrollIntoView({ block: 'center', behavior: motion() === 'on' ? 'smooth' : 'auto' }), 250);
+});
 composerOpen.addEventListener('click', () => setComposer(true));
 $('composer-cancel').addEventListener('click', () => { setComposer(false); composerOpen.focus(); });
 form.addEventListener('keydown', e => {
@@ -733,6 +767,13 @@ list.addEventListener('click', e => {
   }
   const id = e.target.closest('.item')?.dataset.id;
   if (!id) return;
+  // телефон: нажатие на текст строки раскрывает или сворачивает её действия
+  if (!action && touchLayout.matches && e.target.closest('.item__body') && !e.target.closest('.now')) {
+    expandedId = expandedId === id ? null : id;
+    render();
+    return;
+  }
+  if (action) expandedId = null;
   if (action === 'delete') {
     if (editing?.id === id) editing = null;
     animateListChange(() => removeWithUndo([id], 'Задача удалена'));
@@ -831,14 +872,17 @@ filters.addEventListener('click', e => {
   render();
 });
 
-$('view-switch').addEventListener('click', e => {
+function onViewClick(e) {
   const btn = e.target.closest('[data-view]');
   if (!btn || btn.dataset.view === view) return;
   view = btn.dataset.view;
   try { localStorage.setItem(VIEW_KEY, view); } catch {}
   editing = null;
+  expandedId = null;
   animateViewChange(render);
-});
+}
+$('view-switch').addEventListener('click', onViewClick);
+document.querySelector('.bottombar__views').addEventListener('click', onViewClick);
 
 sortSelect.addEventListener('change', () => {
   sort = sortSelect.value;
@@ -982,6 +1026,20 @@ accountBtn.addEventListener('click', () => {
   dialog.showModal();
 });
 $('dialog-close').addEventListener('click', () => dialog.close());
+// на телефоне окна — листы снизу: кнопка «Назад» закрывает их, а не уходит со страницы
+for (const d of [dialog, deleteDialog]) {
+  new MutationObserver(() => {
+    if (d.open && touchLayout.matches && !d.dataset.inHistory) { history.pushState({ sheet: d.id }, ''); d.dataset.inHistory = '1'; }
+  }).observe(d, { attributes: true, attributeFilter: ['open'] });
+  d.addEventListener('close', () => {
+    if (!d.dataset.inHistory) return;
+    delete d.dataset.inHistory;
+    if (history.state?.sheet === d.id) history.back();
+  });
+}
+window.addEventListener('popstate', () => {
+  for (const d of [deleteDialog, dialog]) if (d.open && d.dataset.inHistory) { delete d.dataset.inHistory; d.close(); break; }
+});
 for (const d of [dialog, deleteDialog]) d.addEventListener('click', e => { if (e.target === d) d.close(); });
 dialog.querySelector('.tabs').addEventListener('click', e => {
   const btn = e.target.closest('button[data-mode]');
@@ -1115,6 +1173,7 @@ function applyTheme() {
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   document.documentElement.dataset.themeMode = themeMode;
   $('view-icon').setAttribute('href', `icons.svg#${THEME_ICONS[themeMode]}`);
+  $('theme-color').setAttribute('content', dark ? '#171C19' : '#F1F2EE');
   viewBtn.title = `Вид: тема — ${THEME_TITLES[themeMode]}`;
   viewMenu.querySelectorAll('[data-theme-mode]').forEach(i => i.setAttribute('aria-checked', String(i.dataset.themeMode === themeMode)));
 }
@@ -1146,7 +1205,13 @@ applyMotion();
 
 // линия под шапкой появляется, когда страница прокручена
 const topbar = document.querySelector('.topbar');
-const onScroll = () => topbar.classList.toggle('is-scrolled', window.scrollY > 4);
+let lastScroll = window.scrollY;
+const onScroll = () => {
+  const y = window.scrollY;
+  topbar.classList.toggle('is-scrolled', y > 4);
+  if (touchLayout.matches) topbar.classList.toggle('is-hidden', y > lastScroll && y > 120);
+  lastScroll = y;
+};
 window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
 
@@ -1156,5 +1221,5 @@ Cloud.init().finally(() => {
   accountReady = true;
   renderAi();
   // первый визит: задач нет — сразу открытая форма с курсором в поле названия
-  if (!tasks.length) setComposer(true);
+  if (!tasks.length && !touchLayout.matches) setComposer(true);
 });

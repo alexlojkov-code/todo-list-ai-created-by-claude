@@ -883,3 +883,134 @@ html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
 }
+
+/* =====================================================================
+   Телефон и удобство (REDESIGN-PLAN.md): до 640 px и сенсорный ввод.
+   Закреплена только нижняя панель; шапка уезжает при прокрутке вниз.
+   ===================================================================== */
+.bottombar, .sheet-backdrop { display: none; }
+.item__more { display: none; }
+
+@media (max-width: 640px) {
+  :root { --gutter: 16px; --fs-display: 28px; --fs-h1: 28px; --fs-h2: 22px; }
+  html { -webkit-tap-highlight-color: transparent; }
+
+  .topbar { transition: transform var(--dur-base) var(--ease), box-shadow var(--dur-fast) var(--ease); }
+  .topbar.is-hidden { transform: translateY(-100%); }
+  .topbar__inner { height: 56px; }
+  .topbar__title { font-size: 18px; }
+
+  .app { padding-bottom: calc(64px + env(safe-area-inset-bottom) + var(--space-5)); }
+
+  /* сводка в две строки, переключатель режимов — в нижней панели */
+  .summary { margin-bottom: var(--space-4); }
+  .summary__nums { display: block; }
+  .summary__nums::before { content: none !important; }
+  #view-switch { display: none; }
+
+  /* фильтры на всю ширину, под ними сортировка и AI */
+  .controls { flex-direction: column; align-items: stretch; }
+  .filters { display: flex; width: 100%; }
+  .filters > button { flex: 1; justify-content: center; min-height: 44px; padding: 0 var(--space-2); }
+  .controls__right { justify-content: space-between; }
+  .sort, .sort .select { flex: 1; width: 100%; }
+
+  /* строка «Добавить дело» в списке скрыта — кнопка в нижней панели */
+  .composer__open { display: none; }
+  .composer { margin: 0; }
+
+  /* форма добавления — лист снизу */
+  body.sheet-open { overflow: hidden; }
+  .sheet-backdrop:not([hidden]) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(23, 28, 25, .4);
+    animation: fade-in var(--dur-base) var(--ease);
+  }
+  .composer.is-open .composer__form {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--space-5) var(--space-4) calc(var(--space-5) + env(safe-area-inset-bottom));
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow: var(--shadow-4);
+    animation: sheet-in var(--dur-slow) var(--ease);
+  }
+  @keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } }
+  .composer__row { grid-template-columns: 1fr; }
+  .input--date { flex: 1; min-width: 0; }
+  .chip { min-height: 40px; }
+  .composer__actions > .btn, .item__form-actions > .btn:not(.btn--danger-text) { flex: 1; min-height: 48px; }
+  .item__form-actions { flex-wrap: wrap; }
+  .item__form-actions .btn--danger-text { order: -1; flex-basis: 100%; justify-content: flex-start; margin-bottom: var(--space-4); }
+  .item__form-actions .spacer { display: none; }
+  .item__form-hint { display: none; }
+
+  /* окна — листы снизу */
+  .dialog {
+    width: 100%;
+    max-width: none;
+    margin: auto 0 0;
+    padding: var(--space-5) var(--space-4) calc(var(--space-5) + env(safe-area-inset-bottom));
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+  .dialog[open] { animation: sheet-in var(--dur-slow) var(--ease); }
+  .dialog .input { min-height: 48px; }
+  .dialog__actions > .btn { flex: 1; min-height: 48px; }
+
+  /* строки задач: действия по нажатию на строку, подписанными кнопками */
+  /* между зоной нажатия отметки (44 px) и текстом строки — не меньше 8 px */
+  .item { min-height: 56px; padding: var(--space-3); column-gap: 18px; }
+  .item__actions { display: none; }
+  .item__title { -webkit-line-clamp: 2; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+  .item.is-expanded .item__title { display: block; }
+  .now .now__text { -webkit-line-clamp: 4; }
+  .item.is-expanded { box-shadow: inset 3px 0 0 var(--c-ink); }
+  .item__more {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin: var(--space-1) calc(-1 * var(--space-2)) calc(-1 * var(--space-1));
+  }
+  .item__more .btn { flex: 1 1 auto; min-height: 44px; padding: 0 var(--space-3); }
+
+  /* карточка «Сейчас» */
+  .now { padding: var(--space-5); border-radius: 20px; }
+  .now__desc { font-size: var(--fs-body); -webkit-line-clamp: 3; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+  .now__actions > .btn { flex: 1; min-height: 48px; }
+
+  .group__title { font-size: var(--fs-h2); }
+  .empty { padding: var(--space-7) var(--space-4); }
+
+  /* нижняя панель — единственная закреплённая полоса */
+  .bottombar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--gutter) calc(var(--space-2) + env(safe-area-inset-bottom));
+    background: var(--c-bg);
+    box-shadow: 0 -1px 0 var(--c-divider);
+  }
+  .bottombar__add { flex: 1; }
+  .bottombar__views > button { min-height: 44px; min-width: 48px; justify-content: center; padding: 0 var(--space-3); }
+
+  /* уведомление — над нижней панелью */
+  .toast { bottom: calc(64px + env(safe-area-inset-bottom) + var(--space-3)); width: calc(100% - 2 * var(--gutter)); max-width: none; }
+}
+
+@media (min-width: 390px) and (max-width: 640px) { :root { --fs-display: 32px; } }
+
+.summary__nums::before { content: " · "; }

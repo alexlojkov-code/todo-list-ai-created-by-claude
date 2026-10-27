@@ -2,7 +2,8 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#F1F2EE" id="theme-color">
   <title>Список дел</title>
   <meta name="description" content="Список дел с AI-приоритезацией задач">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -136,6 +137,15 @@
     <p class="empty" id="empty" hidden></p>
     <button type="button" class="btn btn--quiet" id="clear-done" hidden><svg class="icon" aria-hidden="true"><use href="icons.svg#trash"/></svg>Очистить готовые</button>
   </main>
+
+  <nav class="bottombar" aria-label="Быстрые действия">
+    <button type="button" class="btn btn--primary btn--lg bottombar__add" id="bottom-add"><svg class="icon" aria-hidden="true"><use href="icons.svg#plus"/></svg>Добавить дело</button>
+    <div class="segmented bottombar__views" role="group" aria-label="Режим">
+      <button type="button" data-view="list" aria-pressed="true" aria-label="Весь список" title="Весь список"><svg class="icon" aria-hidden="true"><use href="icons.svg#menu"/></svg></button>
+      <button type="button" data-view="focus" aria-pressed="false" aria-label="Фокус" title="Фокус"><svg class="icon" aria-hidden="true"><use href="icons.svg#arrow-right"/></svg></button>
+    </div>
+  </nav>
+  <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
 
   <div class="toast" id="toast" role="status" hidden>
     <svg class="icon toast__icon" aria-hidden="true"><use id="toast-icon" href="icons.svg#check"/></svg>
