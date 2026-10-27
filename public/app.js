@@ -35,6 +35,9 @@ const openReasons = new Set();
 // Редактируемая задача и черновик полей: черновик переживает перерисовку (например, при синхронизации)
 let editing = null; // { id, title, description, dueDate }
 let doneOpen = false; // раскрыта ли группа «Готово»
+const VIEW_KEY = 'todo-list-ai.view';
+let view = (() => { try { return localStorage.getItem(VIEW_KEY) === 'focus' ? 'focus' : 'list'; } catch { return 'list'; } })();
+let doneTodayOpen = false;
 let undoAction = null; // отмена последнего удаления (уведомление «Отменить»)
 
 // ---------- хранение ----------
@@ -236,6 +239,7 @@ function renderTask(task) {
     meta.push(el('span', { className: 'item__due' + (overdue ? ' is-overdue' : '') },
       overdue ? [icon('clock'), `просрочено · ${formatDue(task.dueDate)}`] : [formatDue(task.dueDate)]));
   }
+  if (task.deferredOn === today() && !task.done) meta.push(el('span', { className: 'item__deferred' }, [icon('later'), 'отложено на сегодня']));
   if (task.prioritySource === 'manual') {
     meta.push(el('button', {
       type: 'button', className: 'badge badge--lock',
@@ -257,6 +261,7 @@ function renderTask(task) {
   ]);
 
   const actions = el('div', { className: 'item__actions' }, [
+    ...(task.done ? [] : [el('button', { type: 'button', className: 'icon-btn', dataset: { action: 'pin' }, 'aria-label': `Сделать сейчас: «${task.title}»`, title: 'Сделать сейчас' }, [icon('pin')])]),
     el('button', { type: 'button', className: 'icon-btn', dataset: { action: 'edit' }, 'aria-label': `Изменить «${task.title}»`, title: 'Изменить' }, [icon('pencil')]),
     el('button', { type: 'button', className: 'icon-btn icon-btn--danger', dataset: { action: 'delete' }, 'aria-label': `Удалить «${task.title}»`, title: 'Удалить' }, [icon('trash')]),
   ]);
@@ -312,7 +317,91 @@ function renderStats() {
   filters.querySelectorAll('[data-count]').forEach(c => { c.textContent = counts[c.dataset.count] || ''; });
 }
 
+// ---------- режим «Фокус» ----------
+
+// Порядок очереди: закреплённая → просроченные → на сегодня → остальные (внутри — прежний compare()
+// в режиме «по приоритету», с учётом оценки AI) → отложенные сегодня, в порядке откладывания.
+function focusOrder() {
+  const t = today();
+  const active = tasks.filter(x => !x.done);
+  const pinned = active.filter(x => x.pinnedAt).sort((a, b) => (a.pinnedAt < b.pinnedAt ? 1 : -1)).slice(0, 1);
+  const isDeferred = x => x.deferredOn === t && !pinned.includes(x);
+  const urgency = x => (x.dueDate && x.dueDate < t ? 0 : x.dueDate === t ? 1 : 2);
+  const prev = sort;
+  sort = 'priority';
+  const normal = active.filter(x => !pinned.includes(x) && !isDeferred(x)).sort((a, b) => urgency(a) - urgency(b) || compare(a, b));
+  sort = prev;
+  const deferredToday = active.filter(isDeferred).sort((a, b) => ((a.deferredSeq || '') < (b.deferredSeq || '') ? -1 : 1));
+  return [...pinned, ...normal, ...deferredToday];
+}
+
+function renderNow(task) {
+  if (editing?.id === task.id) return el('ul', { className: 'group__list now-edit' }, [renderEditor(task)]);
+  const overdue = task.dueDate && task.dueDate < today();
+  const meta = [];
+  const mark = priorityMark(task);
+  if (mark) meta.push(mark);
+  if (task.dueDate) meta.push(el('span', { className: 'item__due' + (overdue ? ' is-overdue' : '') },
+    overdue ? [icon('clock'), `просрочено · ${formatDue(task.dueDate)}`] : [`срок · ${formatDue(task.dueDate)}`]));
+  return el('article', { className: 'now item', dataset: { id: task.id }, 'aria-labelledby': 'now-title' }, [
+    el('p', { className: 'now__label' }, [el('span', { className: 'now__dot', 'aria-hidden': 'true' }), 'Сейчас']),
+    el('h2', { className: 'now__title', id: 'now-title', title: 'Дважды щёлкните, чтобы изменить' }, [
+      el('span', { className: 'item__title now__text', textContent: task.title }),
+      el('button', { type: 'button', className: 'icon-btn now__edit', dataset: { action: 'edit' }, 'aria-label': 'Изменить задачу', title: 'Изменить' }, [icon('pencil')]),
+    ]),
+    ...(task.description ? [el('p', { className: 'now__desc', textContent: task.description })] : []),
+    ...(meta.length ? [el('div', { className: 'item__meta now__meta' }, meta)] : []),
+    ...(task.prioritySource === 'ai' && task.aiReason ? [el('p', { className: 'now__reason' }, [icon('sparkle'), task.aiReason])] : []),
+    el('div', { className: 'now__actions' }, [
+      el('button', { type: 'button', className: 'btn btn--secondary btn--lg', dataset: { action: 'defer' } }, [icon('later'), 'Отложить']),
+      el('button', { type: 'button', className: 'btn btn--primary btn--lg', dataset: { action: 'complete' } }, [icon('check'), 'Готово']),
+    ]),
+  ]);
+}
+
+function renderFocus() {
+  const order = focusOrder();
+  const t = today();
+  // дата выполнения — по местному времени, а не по UTC
+  const localDay = iso => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const doneToday = tasks.filter(x => x.done && x.updatedAt && localDay(x.updatedAt) === t);
+  const sections = [];
+  if (order.length) {
+    sections.push(renderNow(order[0]));
+    if (order.length > 1) sections.push(renderGroup('Дальше', order.slice(1)));
+  } else {
+    sections.push(el('article', { className: 'now now--empty' }, [
+      el('p', { className: 'now__label' }, ['Сейчас']),
+      el('h2', { className: 'now__title', textContent: tasks.length ? 'На сегодня всё' : 'Добавьте первое дело' }),
+      el('p', { className: 'now__desc', textContent: tasks.length ? 'Все дела выполнены. Можно отдохнуть или добавить новое.' : 'Здесь будет одно дело, которое стоит сделать сейчас.' }),
+    ]));
+  }
+  if (doneToday.length) {
+    const group = renderGroup('', doneTodayOpen ? doneToday : [], 'group--done');
+    group.prepend(el('button', { type: 'button', className: 'group__toggle', 'aria-expanded': String(doneTodayOpen), dataset: { action: 'toggle-done-today' } },
+      [icon('chevron-down'), 'Сделано сегодня ', el('span', { className: 'count', textContent: String(doneToday.length) })]));
+    sections.push(group);
+  }
+  return sections;
+}
+
+function renderView() {
+  document.body.dataset.view = view;
+  $('view-switch').querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
+}
+
 function render() {
+  renderView();
+  if (view === 'focus') {
+    const focused = document.activeElement?.closest?.('.is-editing') ? document.activeElement.name : null;
+    list.replaceChildren(...renderFocus());
+    if (focused) list.querySelector(`.is-editing [name="${focused}"]`)?.focus();
+    clearDone.hidden = true;
+    empty.hidden = true;
+    renderStats();
+    renderAi();
+    return;
+  }
   const visible = tasks
     .filter(t => filter === 'all' ? true : filter === 'done' ? t.done : !t.done)
     .sort(compare);
@@ -529,10 +618,10 @@ list.addEventListener('change', e => {
 
 list.addEventListener('click', e => {
   const action = e.target.closest('[data-action]')?.dataset.action;
-  if (action === 'toggle-done') {
-    doneOpen = !doneOpen;
+  if (action === 'toggle-done' || action === 'toggle-done-today') {
+    if (action === 'toggle-done') doneOpen = !doneOpen; else doneTodayOpen = !doneTodayOpen;
     render();
-    list.querySelector('[data-action="toggle-done"]')?.focus();
+    list.querySelector(`[data-action="${action}"]`)?.focus();
     return;
   }
   const id = e.target.closest('.item')?.dataset.id;
@@ -542,6 +631,10 @@ list.addEventListener('click', e => {
     removeWithUndo([id], 'Задача удалена');
   }
   if (action === 'unlock') patch(id, { prioritySource: 'default' });
+  if (action === 'complete') { patch(id, { done: true }); showToast('Готово'); }
+  // «Отложить» — в конец очереди до конца местного дня; срок не меняется
+  if (action === 'defer') { patch(id, { deferredOn: today(), deferredSeq: new Date().toISOString(), pinnedAt: undefined }); showToast('Отложено в конец очереди'); }
+  if (action === 'pin') { patch(id, { pinnedAt: new Date().toISOString(), deferredOn: undefined }); showToast(view === 'focus' ? 'Теперь это дело — сейчас' : 'Дело закреплено как «сейчас» в режиме «Фокус»'); }
   if (action === 'edit') startEditing(id);
   if (action === 'edit-cancel') stopEditing();
   if (action === 'reason') {
@@ -617,6 +710,15 @@ filters.addEventListener('click', e => {
   if (!btn) return;
   filter = btn.dataset.filter;
   filters.querySelectorAll('button').forEach(b => b.classList.toggle('is-active', b === btn));
+  render();
+});
+
+$('view-switch').addEventListener('click', e => {
+  const btn = e.target.closest('[data-view]');
+  if (!btn || btn.dataset.view === view) return;
+  view = btn.dataset.view;
+  try { localStorage.setItem(VIEW_KEY, view); } catch {}
+  editing = null;
   render();
 });
 

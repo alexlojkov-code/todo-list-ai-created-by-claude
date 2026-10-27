@@ -49,6 +49,10 @@
   <main class="app">
     <div class="summary">
       <p class="summary__text" id="counter" aria-live="polite"></p>
+      <div class="segmented view-switch" id="view-switch" role="group" aria-label="Режим">
+        <button type="button" data-view="list" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="icons.svg#menu"/></svg><span>Весь список</span></button>
+        <button type="button" data-view="focus" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#arrow-right"/></svg><span>Фокус</span></button>
+      </div>
     </div>
 
     <div class="controls">

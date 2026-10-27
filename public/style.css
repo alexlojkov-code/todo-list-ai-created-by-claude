@@ -751,3 +751,58 @@ body { background: var(--c-bg); color: var(--c-ink); }
 }
 .empty[hidden] { display: none; }
 #clear-done[hidden] { display: none; }
+
+/* =====================================================================
+   Режим «Фокус» (REDESIGN-PLAN.md, страница 1)
+   ===================================================================== */
+.summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.view-switch > button .icon { width: 18px; height: 18px; }
+body[data-view="focus"] .filters,
+body[data-view="focus"] .sort { display: none; }
+/* в «Фокусе» над главной задачей ничего лишнего: фильтры, сортировка и AI — в «Весь список» */
+body[data-view="focus"] .controls,
+body[data-view="focus"] .ai-hint { display: none; }
+/* строка «Добавить дело» в «Фокусе» — под очередью */
+.app { display: flex; flex-direction: column; }
+body[data-view="focus"] .composer { order: 10; margin-top: var(--space-6); }
+
+.now {
+  display: block;
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-1);
+}
+.now__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  font: 500 var(--fs-caption)/1.4 var(--font-text);
+  color: var(--c-accent);
+}
+.now__dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--c-accent); }
+.now__title { display: flex; align-items: flex-start; gap: var(--space-2); margin: 0; }
+.now__text {
+  font: 400 var(--fs-display)/1.2 var(--font-head) !important;
+  letter-spacing: -0.01em;
+  color: var(--c-ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.now__edit { margin-top: 6px; opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
+.now:hover .now__edit, .now:focus-within .now__edit { opacity: 1; }
+@media (hover: none) { .now__edit { opacity: 1; } }
+.now__desc { margin: var(--space-3) 0 0; font-size: var(--fs-lead); line-height: 1.55; color: var(--c-text-2); max-width: 60ch; overflow-wrap: anywhere; }
+.now__meta { margin-top: var(--space-4); }
+.now__reason { display: flex; gap: var(--space-2); margin: var(--space-4) 0 0; font-size: var(--fs-small); color: var(--c-text-2); }
+.now__reason .icon { width: 16px; height: 16px; margin-top: 2px; }
+.now__actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-6); }
+.now--empty .now__title { font: 400 var(--fs-h2)/1.3 var(--font-head); color: var(--c-ink); }
+.now--empty .now__label { color: var(--c-text-2); }
+.now-edit { padding: 0; background: none; }
+.item__deferred { display: inline-flex; align-items: center; gap: 4px; }
+.item__deferred .icon { width: 16px; height: 16px; }
+body[data-view="focus"] .list { gap: var(--space-7); }
