@@ -1212,6 +1212,26 @@ systemDark.addEventListener('change', () => { if (themeMode === 'auto') applyThe
 applyTheme();
 applyMotion();
 
+// ---------- часы с секундами и координаты курсора, как в прошлой версии (декоративные) ----------
+
+const clock = $('clock');
+const coords = $('coords');
+function tickClock() {
+  const now = new Date();
+  clock.textContent = `${now.toLocaleDateString('ru-RU', WEEKDAY_DATE)}_${now.toLocaleTimeString('ru-RU')}`;
+}
+tickClock();
+setInterval(tickClock, 1000);
+let coordsFrame = 0;
+window.addEventListener('pointermove', e => {
+  if (coordsFrame) return;
+  coordsFrame = requestAnimationFrame(() => {
+    coordsFrame = 0;
+    const pad = n => String(Math.round(n)).padStart(4, '0');
+    coords.textContent = `${pad(e.clientX)} X ${pad(e.clientY)} Y`;
+  });
+}, { passive: true });
+
 // линия под шапкой появляется, когда страница прокручена
 const topbar = document.querySelector('.topbar');
 let lastScroll = window.scrollY;

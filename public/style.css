@@ -1283,3 +1283,29 @@ body { font: 400 var(--fs-body)/1.55 var(--font-text); letter-spacing: -0.01em; 
   /* между зоной нажатия квадратной отметки и текстом строки — не меньше 8 px */
   .item { column-gap: 20px; }
 }
+
+/* часы с секундами в шапке и координаты курсора в углу — как в прошлой версии */
+.topbar__inner { position: relative; }
+.topbar__clock {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  font: 400 var(--fs-caption)/1 var(--font-text);
+  color: var(--c-text-2);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.coords {
+  position: fixed;
+  left: var(--space-5);
+  bottom: var(--space-4);
+  z-index: 10;
+  margin: 0;
+  font: 400 var(--fs-caption)/1 var(--font-text);
+  color: var(--c-text-2);
+  pointer-events: none;
+}
+/* координаты помещаются только в свободное поле слева от колонки; часы — пока не спорят с названием */
+@media (max-width: 1240px) { .coords { display: none; } }
+@media (max-width: 760px) { .topbar__clock { display: none; } }

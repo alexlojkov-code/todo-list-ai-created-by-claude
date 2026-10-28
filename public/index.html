@@ -32,6 +32,7 @@
   <header class="topbar">
     <div class="topbar__inner">
       <p class="topbar__title" aria-hidden="true">Список дел<svg class="icon topbar__mark"><use href="icons.svg#asterisk"/></svg></p>
+      <p class="topbar__clock" id="clock" aria-hidden="true"></p>
       <div class="topbar__actions">
         <div class="menu-wrap">
           <button type="button" class="icon-btn" id="view-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu" aria-label="Вид" title="Вид: тема">
@@ -156,6 +157,8 @@
     <p class="empty" id="empty" hidden></p>
     <button type="button" class="btn btn--quiet" id="clear-done" hidden><svg class="icon" aria-hidden="true"><use href="icons.svg#trash"/></svg>Очистить готовые</button>
   </main>
+
+  <p class="coords" id="coords" aria-hidden="true">0000 X 0000 Y</p>
 
   <nav class="bottombar" aria-label="Быстрые действия">
     <button type="button" class="btn btn--primary btn--lg bottombar__add" id="bottom-add"><svg class="icon" aria-hidden="true"><use href="icons.svg#plus"/></svg>Добавить дело</button>
