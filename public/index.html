@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-  <meta name="theme-color" content="#F1F2EE" id="theme-color">
+  <meta name="theme-color" content="#FCFCFA" id="theme-color">
   <title>Список дел</title>
   <meta name="description" content="Список дел с AI-приоритезацией задач">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Tenor+Sans&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Oswald:wght@400;500;600&display=swap">
   <script>
     // Тема до первой отрисовки, чтобы не было вспышки. Новым посетителям — светлая,
     // сохранённый выбор (в том числе «как в системе») не меняется.
@@ -31,7 +31,7 @@
 <body>
   <header class="topbar">
     <div class="topbar__inner">
-      <h1 class="topbar__title">Список дел</h1>
+      <p class="topbar__title" aria-hidden="true">Список дел<svg class="icon topbar__mark"><use href="icons.svg#asterisk"/></svg></p>
       <div class="topbar__actions">
         <div class="menu-wrap">
           <button type="button" class="icon-btn" id="view-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu" aria-label="Вид" title="Вид: тема">
@@ -51,7 +51,7 @@
         </div>
         <button type="button" class="icon-btn account-btn" id="account-btn" hidden>
           <svg class="icon" aria-hidden="true"><use href="icons.svg#user"/></svg>
-          <span class="sr-only" id="account-label">Войти</span>
+          <span class="account-btn__label" id="account-label">Войти</span>
           <span class="sync" id="sync" data-state="off" aria-hidden="true"></span>
         </button>
       </div>
@@ -59,8 +59,27 @@
   </header>
 
   <main class="app">
+    <section class="hero" aria-label="Сводка">
+      <div class="hero__main">
+        <p class="label" id="hero-date"></p>
+        <h1 class="hero__title" aria-label="Список дел">
+          <span class="hero__line">Список</span>
+          <span class="hero__line hero__line--shift"><span class="hero__bar" aria-hidden="true"></span>дел</span>
+        </h1>
+      </div>
+      <aside class="hero__stats">
+        <dl class="stats">
+          <div class="stat"><dt>активные</dt><dd id="stat-active">00</dd></div>
+          <div class="stat stat--alert"><dt>просрочено</dt><dd id="stat-overdue">00</dd></div>
+          <div class="stat"><dt>на сегодня</dt><dd id="stat-today">00</dd></div>
+          <div class="stat"><dt>готово</dt><dd id="stat-done">00</dd></div>
+        </dl>
+        <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
+        <p class="summary__text" id="counter" aria-live="polite"></p>
+      </aside>
+    </section>
+
     <div class="summary">
-      <p class="summary__text" id="counter" aria-live="polite"></p>
       <div class="segmented view-switch" id="view-switch" role="group" aria-label="Режим">
         <button type="button" data-view="list" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="icons.svg#menu"/></svg><span>Весь список</span></button>
         <button type="button" data-view="focus" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="icons.svg#arrow-right"/></svg><span>Фокус</span></button>
@@ -93,7 +112,7 @@
 
     <section class="composer" id="composer">
       <button type="button" class="composer__open" id="composer-open" aria-expanded="false" aria-controls="add-form">
-        <svg class="icon" aria-hidden="true"><use href="icons.svg#plus"/></svg><span>Добавить дело</span>
+        <svg class="icon" aria-hidden="true"><use href="icons.svg#plus"/></svg><span>Что нужно сделать?</span>
       </button>
       <form class="composer__form" id="add-form" autocomplete="off" hidden>
         <label class="field">

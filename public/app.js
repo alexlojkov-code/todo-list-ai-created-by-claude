@@ -324,9 +324,18 @@ function renderStats() {
     if (overdue) parts.push(`${overdue} ${plural(overdue, 'просрочено', 'просрочено', 'просрочено')}`);
     parts.push(`готово ${Math.round(done / tasks.length * 100)}%`);
   }
-  // дата и цифры — двумя частями: на десктопе в строку, на телефоне в две строки
-  counter.replaceChildren(el('span', { className: 'summary__date', textContent: parts[0] }),
-    ...(parts.length > 1 ? [el('span', { className: 'summary__nums', textContent: parts.slice(1).join(' · ') })] : []));
+  // первый экран: дата, четыре числа и полоса прогресса, как в прошлой версии
+  const pad = n => String(n).padStart(2, '0');
+  const due = active.filter(x => x.dueDate === t).length;
+  $('hero-date').textContent = parts[0];
+  $('stat-active').textContent = pad(active.length);
+  $('stat-overdue').textContent = pad(overdue);
+  $('stat-overdue').closest('.stat').classList.toggle('is-active', overdue > 0);
+  $('stat-today').textContent = pad(due);
+  $('stat-done').textContent = pad(done);
+  const percent = tasks.length ? Math.round(done / tasks.length * 100) : 0;
+  $('progress-bar').style.width = percent + '%';
+  counter.textContent = tasks.length ? `готово ${percent}% · ${done} из ${tasks.length}` : 'задач пока нет';
   const counts = { all: tasks.length, active: active.length, done };
   filters.querySelectorAll('[data-count]').forEach(c => { c.textContent = counts[c.dataset.count] || ''; });
 }
@@ -950,7 +959,7 @@ function syncedAgo() {
 function renderAccount() {
   accountBtn.hidden = !Cloud.available;
   const user = Cloud.user;
-  accountLabel.textContent = user ? `Аккаунт: ${user.email}` : 'Войти';
+  accountLabel.textContent = user ? (user.name || user.email.split('@')[0]) : 'Войти';
   accountBtn.setAttribute('aria-label', user ? `Аккаунт: ${user.email}` : 'Войти или зарегистрироваться');
   syncDot.dataset.state = user ? Cloud.status : 'off';
   accountBtn.title = user ? `${user.email}${SYNC_TEXT[Cloud.status] ? ' · ' + SYNC_TEXT[Cloud.status] : ''}` : 'Войти или зарегистрироваться';
@@ -1173,7 +1182,7 @@ function applyTheme() {
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   document.documentElement.dataset.themeMode = themeMode;
   $('view-icon').setAttribute('href', `icons.svg#${THEME_ICONS[themeMode]}`);
-  $('theme-color').setAttribute('content', dark ? '#171C19' : '#F1F2EE');
+  $('theme-color').setAttribute('content', dark ? '#1B1A18' : '#FCFCFA');
   viewBtn.title = `Вид: тема — ${THEME_TITLES[themeMode]}`;
   viewMenu.querySelectorAll('[data-theme-mode]').forEach(i => i.setAttribute('aria-checked', String(i.dataset.themeMode === themeMode)));
 }
@@ -1209,6 +1218,7 @@ let lastScroll = window.scrollY;
 const onScroll = () => {
   const y = window.scrollY;
   topbar.classList.toggle('is-scrolled', y > 4);
+  topbar.classList.toggle('show-title', y > (document.querySelector('.hero')?.offsetHeight || 0));
   if (touchLayout.matches) topbar.classList.toggle('is-hidden', y > lastScroll && y > 120);
   lastScroll = y;
 };
